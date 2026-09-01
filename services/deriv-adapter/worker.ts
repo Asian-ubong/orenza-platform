@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { decryptSecret } from '@/lib/security/secret-box';
 
 const API = 'https://api.derivws.com';
@@ -74,8 +75,24 @@ export async function syncDerivConnection(connectionId: string) {
     await db(`broker_connections?id=eq.${encodeURIComponent(connectionId)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'CONNECTED', last_heartbeat_at: new Date().toISOString(), last_sync_at: new Date().toISOString(), last_error: null }) });
   } catch (error) {
     await db(`broker_connections?id=eq.${encodeURIComponent(connectionId)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'DEGRADED', last_error: error instanceof Error ? error.message : 'DERIV_SYNC_ERROR' }) }).catch(() => undefined);
+    try { ws.close(); } catch {}
     throw error;
   }
 
-  return { connectionId, status: 'CONNECTED', environment: connection.environment };
+  return { connectionId, status: 'CONNECTED', environment: connection.environment, websocket: ws };
+}
+
+export async function runDerivWorker(connectionId: string) {
+  let delay = 1000;
+  for (;;) {
+    try {
+      const result = await syncDerivConnection(connectionId);
+      delay = 1000;
+      await new Promise<void>((resolve) => setTimeout(resolve, 30_000));
+      try { result.websocket.close(); } catch {}
+    } catch {
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+      delay = Math.min(delay * 2, 60_000);
+    }
+  }
 }
