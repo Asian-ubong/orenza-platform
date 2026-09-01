@@ -1,0 +1,5 @@
+import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
+
+export default function ProviderLogin() {
+  return <main className="gate"><div className="gateCard wide"><div className="logoMark small">O</div><p className="eyebrow">AUTHORIZED PROVIDER LOGIN</p><h1>CONNECT YOUR ACCOUNT</h1><p>Use an authorized provider connection. Orenza does not create a public trading account.</p><div className="providerChoices"><a href="/security-check" className="providerChoice"><div><strong>CONTINUE WITH DERIV</strong><small>Authorized provider authentication</small></div><ArrowRight/></a><div className="providerChoice disabled"><div><strong>CONNECT MT5</strong><small>Secure connection process · optional</small></div><span>AVAILABLE LATER</span></div></div><div className="gateNotice"><LockKeyhole size={18}/><span>Credentials, client secrets and provider passwords never enter the browser interface.</span></div><div className="splashTrust"><ShieldCheck size={16}/><span>Secure provider redirect · Return to Orenza after authentication</span></div></div></main>;
+}
