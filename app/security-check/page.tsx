@@ -1,0 +1,4 @@
+import { ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+
+const checks=['Authorized connection','Private access permission','Session security','Device status'];
+export default function SecurityCheck(){return <main className="gate"><div className="gateCard wide"><div className="logoMark small">O</div><p className="eyebrow">SECURITY VERIFICATION</p><h1>CHECKING SECURE ACCESS</h1><p>Orenza verifies the access context before entering the private workspace.</p><div className="checkList">{checks.map(x=><div key={x}><CheckCircle2 size={18}/><span>{x}</span><b>READY</b></div>)}</div><div className="gateNotice"><ShieldCheck size={18}/><span>Live provider authentication and account data are not fabricated. Backend validation is required before sensitive operations.</span></div><a className="btn full" href="/home">Enter dashboard <ArrowRight size={17}/></a></div></main>}
