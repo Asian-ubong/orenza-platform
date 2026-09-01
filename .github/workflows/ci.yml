@@ -1,0 +1,31 @@
+name: ORENZA CI
+
+on:
+  push:
+    branches: [main, development, 'feature/**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+      DERIV_APP_ID: ci-placeholder
+      DERIV_OAUTH_CLIENT_ID: ci-placeholder
+      DERIV_OAUTH_REDIRECT_URI: https://example.com/api/brokers/deriv/oauth/callback
+      ORENZA_TOKEN_ENCRYPTION_KEY: ci-placeholder
+      ENABLE_REAL_TRADING: 'false'
+      ENABLE_REAL_PAYMENTS: 'false'
+      ENABLE_REAL_WITHDRAWALS: 'false'
+      ENABLE_REAL_TRANSFERS: 'false'
+      ENABLE_PROFIT_PAYOUT: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - run: npx tsc --noEmit
+      - run: npm run build
