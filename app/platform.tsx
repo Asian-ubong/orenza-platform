@@ -8,19 +8,24 @@ import {
   LogOut, Menu, PlayCircle, Settings, ShieldCheck, Sparkles, TrendingUp, UserRound,
   WalletCards, X, Zap,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-const nav = [
+const nav: Array<[string, string, LucideIcon]> = [
   ['home','HOME',BriefcaseBusiness], ['markets','MARKETS',Globe2], ['ai-premium','AI PREMIUM',Sparkles],
   ['trade','TRADE / INVEST',TrendingUp], ['portfolio','PORTFOLIO',BarChart3], ['wallet','WALLET',WalletCards],
   ['payout','PAYOUT',CircleDollarSign], ['activity','ACTIVITY',Activity], ['announcements','ANNOUNCEMENTS',Bell],
   ['events','EVENTS',Clock3], ['videos','VIDEOS',PlayCircle], ['settings','SETTINGS',Settings],
-] as const;
+];
 
 const labels: Record<string,string> = {
   sandbox:'SANDBOX', markets:'MARKETS', 'ai-premium':'AI PREMIUM', trade:'TRADE / INVEST', portfolio:'PORTFOLIO', wallet:'WALLET',
   payout:'PAYOUT', activity:'ACTIVITY / LEDGER', announcements:'ANNOUNCEMENTS', events:'EVENTS', videos:'VIDEOS', settings:'SETTINGS',
   security:'SECURITY CENTER', 'market-detail':'MARKET DETAIL', 'payout-history':'PAYOUT HISTORY', 'profit-units':'PROFIT UNITS',
 };
+
+const quickActions: Array<[string, string, LucideIcon]> = [
+  ['/sandbox','SANDBOX',WalletCards], ['/markets','MARKETS',Globe2], ['/ai-premium','AI PREMIUM',Sparkles], ['/wallet','WALLET',CreditCard],
+];
 
 function Badge({children, tone='neutral'}:{children:React.ReactNode;tone?:'neutral'|'good'|'warn'|'danger'}) {
   return <span className={`badge ${tone}`}>{children}</span>;
@@ -48,7 +53,7 @@ function Dashboard() {
       <Metric label="PROFIT UNITS" value="0 Units" sub="Internal records" icon={CircleDollarSign}/>
     </div>
     <Section title="Quick actions" sub="Move through the platform without mixing account sources.">
-      <div className="quickGrid">{[['/sandbox','SANDBOX',WalletCards],['/markets','MARKETS',Globe2],['/ai-premium','AI PREMIUM',Sparkles],['/wallet','WALLET',CreditCard]].map(([href,title,Icon])=><a className="quick" href={href as string} key={title as string}><Icon size={19}/><span>{title}</span><ChevronRight size={16}/></a>)}</div>
+      <div className="quickGrid">{quickActions.map(([href,title,Icon])=><a className="quick" href={href} key={title}><Icon size={19}/><span>{title}</span><ChevronRight size={16}/></a>)}</div>
     </Section>
     <Section title="Account sources" sub="Balances and provider records stay separate by design.">
       <div className="providerGrid"><ProviderState name="Sandbox Money" connected/><ProviderState name="Deriv" connected/><ProviderState name="MT5"/></div>
@@ -56,7 +61,7 @@ function Dashboard() {
   </>;
 }
 
-function Metric({label,value,sub,icon:Icon,tone}:{label:string;value:string;sub:string;icon:any;tone?:'good'|'neutral'}) {
+function Metric({label,value,sub,icon:Icon,tone}:{label:string;value:string;sub:string;icon:LucideIcon;tone?:'good'|'neutral'}) {
   return <Card><div className="metricIcon"><Icon size={18}/></div><span className="label">{label}</span><strong className="metricValue">{value}</strong><small className={tone==='good'?'goodText':''}>{sub}</small></Card>;
 }
 
@@ -91,24 +96,17 @@ function ActivityPage() { return <><PageHead eyebrow="AUDITABLE HISTORY" title="
 
 function PayoutHistory() { return <><PageHead eyebrow="PAYOUT RECORDS" title="Payout History" sub="Every payout request is independently tracked."/><Card><div className="empty"><CreditCard size={20}/><span>No payout records.</span><small>Payout ID • Amount • Method • Date • Status</small></div></Card></>; }
 
-function Security() { return <><PageHead eyebrow="PROTECTION" title="Security Center" sub="Review sessions, devices and recent security activity."/><div className="signalGrid"><Card><LockKeyhole size={20}/><h3>Active sessions</h3><p className="muted">Current private session</p><Button href="/settings" secondary>Manage</Button></Card><Card><ShieldCheck size={20}/><h3>Trusted devices</h3><p className="muted">No additional devices shown.</p><Button href="/settings" secondary>Review</Button></Card><Card><Activity size={20}/><h3>Recent security activity</h3><p className="muted">No suspicious activity reported.</p><Button href="/activity" secondary>Review activity</Button></Card></div><div className="buttonRow"><button className="btn secondary">Sign out other devices <LogOut size={16}/></button><button className="btn secondary">Revoke session <X size={16}/></button></div></>; }
+function Security() { return <><PageHead eyebrow="PROTECTION" title="Security Center" sub="Review sessions, devices and recent security activity."/><div className="signalGrid"><Card><LockKeyhole size={20}/><h3>Session security</h3><p className="muted">Protected by server-side authorization and audit records.</p></Card><Card><ShieldCheck size={20}/><h3>Provider credentials</h3><p className="muted">Sensitive credentials are never exposed to the client.</p></Card><Card><Activity size={20}/><h3>Audit trail</h3><p className="muted">Security-sensitive events are retained for review.</p></Card></div></>; }
 
-function SettingsPage() { return <><PageHead eyebrow="CONTROL CENTER" title="Settings" sub="Manage profile, connections, security, notifications, payout settings and privacy."/><div className="settingsGrid">{['PROFILE','CONNECTED ACCOUNTS','DERIV CONNECTION','MT5 CONNECTION','SECURITY','ACTIVE DEVICES','SESSIONS','NOTIFICATIONS','PAYOUT SETTINGS','PRIVACY'].map((x,i)=><a className="setting" href={x==='SECURITY'?'/security':undefined} key={x}><UserRound size={18}/><div><strong>{x}</strong><small>{i===2?'Connected':i===3?'Not connected':'Manage settings'}</small></div><ChevronRight size={16}/></a>)}</div></>; }
+function Generic({title}:{title:string}) { return <><PageHead eyebrow="ORENZA" title={title} sub="This section is ready for its connected data and workflow layer."/><Card><div className="empty"><Zap size={20}/><span>Module ready.</span><small>Backend integration and verified data will populate this view.</small></div></Card></>; }
 
-function Content({screen}:{screen:string}) {
-  if(screen==='home') return <Dashboard/>; if(screen==='sandbox') return <Sandbox/>; if(screen==='markets') return <Markets/>; if(screen==='market-detail') return <MarketDetail/>;
-  if(screen==='ai-premium') return <AIPremium/>; if(screen==='trade') return <Trade/>; if(screen==='trade/confirm') return <Confirm/>; if(screen==='portfolio') return <Portfolio/>;
-  if(screen==='wallet') return <Wallet/>; if(screen==='profit-units') return <ProfitUnits/>; if(screen==='payout') return <Payout/>; if(screen==='payout/security') return <PayoutSecurity/>;
-  if(screen==='payout-history') return <PayoutHistory/>; if(screen==='activity') return <ActivityPage/>; if(screen==='security') return <Security/>; if(screen==='settings') return <SettingsPage/>;
-  if(screen==='announcements') return <Listing title="Announcements" icon={Bell} items={['Private platform update','Security maintenance notice','New market coverage']}/>;
-  if(screen==='events') return <Listing title="Events" icon={Clock3} items={['Upcoming Orenza session','Live market briefing','Past platform event']}/>;
-  if(screen==='videos') return <Listing title="Videos" icon={PlayCircle} items={['Education','Markets','Platform Updates','Events']}/>;
-  return <Dashboard/>;
+function Shell({children}:{children:React.ReactNode}) {
+  const pathname = usePathname();
+  return <div className="appShell"><aside><div className="brand"><span>O</span><b>ORENZA</b></div><div className="privateTag"><LockKeyhole size={11}/> PRIVATE</div><nav>{nav.map(([slug,title,Icon])=><a key={slug} className={pathname===`/${slug}`?'active':''} href={`/${slug}`}><Icon size={16}/>{title}</a>)}</nav><div className="sideSecurity"><ShieldCheck size={16}/><div><b>SECURITY ACTIVE</b><small>Real execution disabled</small></div></div></aside><main><div className="mobileBar"><div className="brand"><span>O</span><b>ORENZA</b></div><button><Menu size={17}/></button></div><div className="topbar"><div>PRIVATE ACCESS <Badge tone="good">SANDBOX</Badge></div><div><span>SECURITY VERIFIED</span><div className="profile"><UserRound size={16}/></div></div></div><div className="content">{children}</div></main></div>;
 }
 
-function Listing({title,icon:Icon,items}:{title:string;icon:any;items:string[]}) { return <><PageHead eyebrow="OFFICIAL ORENZA CONTENT" title={title} sub="Content is presented from authorized Orenza sources."/><div className="signalGrid">{items.map(x=><Card key={x}><Icon size={20}/><h3>{x}</h3><p className="muted">Details will appear when published.</p><Button href="/" secondary>View</Button></Card>)}</div></>; }
-
 export default function Platform() {
-  const pathname=usePathname(); const [open,setOpen]=useState(false); const screen=pathname.split('/').filter(Boolean).join('/')||'home';
-  return <div className="appShell"><aside className={open?'open':''}><div className="brand"><span>O</span><b>ORENZA</b></div><div className="privateTag"><LockKeyhole size={14}/> PRIVATE ACCESS</div><nav>{nav.map(([key,title,Icon])=><a href={`/${key}`} className={screen===key?'active':''} key={key} onClick={()=>setOpen(false)}><Icon size={17}/><span>{title}</span></a>)}</nav><div className="sideSecurity"><ShieldCheck size={18}/><div><b>Secure mode</b><small>Credentials stay server-side</small></div></div></aside><main><div className="mobileBar"><button onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button><div className="brand"><span>O</span><b>ORENZA</b></div></div><div className="topbar"><span>{labels[screen]||'ORENZA'}</span><div><Badge tone="good">PRIVATE</Badge><button className="profile"><UserRound size={16}/></button></div></div><div className="content"><Content screen={screen}/></div></main></div>;
+  const pathname=usePathname();
+  const content = pathname==='/sandbox'?<Sandbox/>:pathname==='/markets'?<Markets/>:pathname==='/market-detail'?<MarketDetail/>:pathname==='/ai-premium'?<AIPremium/>:pathname==='/trade'?<Trade/>:pathname==='/trade/confirm'?<Confirm/>:pathname==='/portfolio'?<Portfolio/>:pathname==='/wallet'?<Wallet/>:pathname==='/profit-units'?<ProfitUnits/>:pathname==='/payout'?<Payout/>:pathname==='/payout/security'?<PayoutSecurity/>:pathname==='/activity'?<ActivityPage/>:pathname==='/payout-history'?<PayoutHistory/>:pathname==='/security'?<Security/>:pathname==='/home'||pathname==='/'?<Dashboard/>:<Generic title={labels[pathname.slice(1)]||'Platform'}/>;
+  return <Shell>{content}</Shell>;
 }
