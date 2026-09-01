@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:demo": "tsx scripts/demo-e2e.ts"
   },
   "dependencies": {
     "@supabase/ssr": "latest",
@@ -19,6 +20,7 @@
     "typescript": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "tsx": "latest"
   }
 }
