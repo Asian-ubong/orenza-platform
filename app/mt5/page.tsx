@@ -11,9 +11,9 @@ export default function MT5Page() {
     <main className="platformShell">
       <header className="pageHead">
         <div>
-          <p className="eyebrow">MT5 PROVIDER</p>
+          <p className="eyebrow">AURENZA BROKER · MT5 PROVIDER</p>
           <h1>MetaTrader 5</h1>
-          <p className="muted">Server-controlled MT5 account, market-data and trading bridge for ORENZA.</p>
+          <p className="muted">Server-controlled MT5 account, market-data and trading bridge for AURENZA BROKER.</p>
         </div>
         <span className={`badge ${status.connected ? 'good' : 'neutral'}`}>
           {status.connected ? 'CONFIGURED' : 'NOT CONNECTED'}
@@ -24,7 +24,7 @@ export default function MT5Page() {
         <ShieldCheck size={20} />
         <div>
           <strong>MT5 stays isolated from Sandbox and Deriv</strong>
-          <span>Credentials belong on the server/bridge only. ORENZA will never display or store an MT5 password in the browser.</span>
+          <span>Credentials belong on the server/bridge only. AURENZA BROKER will never display or store an MT5 password in the browser.</span>
         </div>
       </div>
 
