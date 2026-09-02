@@ -1,26 +1,34 @@
-# ORENZA Platform
+# AURENZA BROKER
 
-Secure Derive-first trading platform foundation with sandbox capital, live provider integration architecture, risk tracking, investment-profit ledgering, and payout-wallet workflows.
+AURENZA BROKER is a private, sandbox-first trading and investment workspace with live provider market-data architecture, risk tracking, portfolio records, and controlled payout workflows.
 
-## Phase 1 scope
+## Current build scope
 
-- ORENZA dashboard foundation
-- Sandbox Money
-- Derive live integration foundation
-- Markets / positions / risk foundation
-- Investment Profit ledger
-- Profit Payout Wallet foundation
+- AURENZA BROKER dashboard and private-access experience
+- AURENZA brand system: forest green, cream, gold, green and controlled red accents
+- Sandbox Money kept separate from provider accounts
+- Live Deriv market discovery through the public `active_symbols` feed
+- Real-world Deriv markets separated from Derived/Synthetic markets
+- Real-time Deriv tick streaming for selected instruments
+- Deriv authenticated integration foundation
+- MT5 server-side adapter and demo-first bridge foundation
+- Portfolio, risk, activity/ledger and payout foundations
 - KYC and security foundation
+- Installable PWA with service-worker update handling
 
-MT5 and other trading integrations remain deferred until the required approvals, credentials, permissions, and integration contracts are available.
+## Market-data rule
 
-## Security
+AURENZA does not hardcode or invent market availability or prices. The Markets screen reads active instruments from Deriv and displays the provider-reported state. Deriv's API exposes active symbols and real-time ticks through its WebSocket market-data endpoints. Availability can vary by country, account, and product, so the app must always show provider truth rather than promise universal availability.
 
-Provider/API credentials are server-side only. Do not commit secrets to GitHub or expose them to the browser. Use Supabase/Vercel server-side environment or secret storage. Live balances, market data, execution, settlement, and profit must be sourced from verified provider events rather than simulated values.
+## Security and release boundary
+
+Provider/API credentials remain server-side. No secrets belong in the browser or Git history. REAL trading and real-money payout remain locked until the required provider credentials, permissions, reconciliation, security checks, legal/operational approvals, and end-to-end verification are complete.
+
+The application is being tested privately and is not being published to Google Play at this stage. The preferred phone/tablet installation path is the installable PWA so devices can receive new web deployments without repeated APK downloads.
 
 ## Documentation
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the Phase 1 architecture and live Derive requirements.
+See `docs/ARCHITECTURE.md`, `docs/MT5_INTEGRATION.md`, and the other files in `docs/` for the implementation boundaries and verification requirements.
 
 ## Development
 
