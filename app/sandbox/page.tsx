@@ -1,8 +1,12 @@
 'use client';
 
 import { ShieldCheck, WalletCards, LockKeyhole, TrendingUp, CircleDollarSign } from 'lucide-react';
+import type { ComponentType } from 'react';
 
-const balances = [
+type IconComponent = ComponentType<{ size?: number }>;
+type BalanceRow = readonly [string, string, string, IconComponent];
+
+const balances: BalanceRow[] = [
   ['SANDBOX CAPITAL', 'Awaiting allocation', 'Virtual trading capital • never withdrawable', WalletCards],
   ['IN ACTIVE TRADES', 'Awaiting provider/sandbox data', 'Reserved sandbox capital', LockKeyhole],
   ['AVAILABLE SANDBOX', 'Awaiting allocation', 'Unreserved virtual capital', WalletCards],
@@ -32,7 +36,7 @@ export default function SandboxMoneyPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 14, marginTop: 16 }}>
           {balances.map(([label, value, note, Icon]) => (
-            <div key={label as string} style={{ padding: 20, borderRadius: 18, background: '#0d1b2d', border: '1px solid rgba(255,255,255,.08)' }}>
+            <div key={label} style={{ padding: 20, borderRadius: 18, background: '#0d1b2d', border: '1px solid rgba(255,255,255,.08)' }}>
               <Icon size={19} />
               <small style={{ display: 'block', marginTop: 10, opacity: .6, letterSpacing: '.08em' }}>{label}</small>
               <strong style={{ display: 'block', marginTop: 10, fontSize: 21 }}>{value}</strong>
