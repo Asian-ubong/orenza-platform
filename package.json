@@ -22,5 +22,6 @@
     "@types/react-dom": "latest",
     "tsx": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "packageManager": "pnpm@10.12.4"
 }
