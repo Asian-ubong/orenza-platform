@@ -1,11 +1,11 @@
-# AURENZA BROKER
+# ORENZA BROKER
 
-AURENZA BROKER is a private, sandbox-first trading and investment workspace with live provider market-data architecture, risk tracking, portfolio records, and controlled payout workflows.
+ORENZA BROKER is a private, sandbox-first trading and investment workspace with live provider market-data architecture, risk tracking, portfolio records, and controlled payout workflows.
 
 ## Current build scope
 
-- AURENZA BROKER dashboard and private-access experience
-- AURENZA brand system: forest green, cream, gold, green and controlled red accents
+- ORENZA BROKER dashboard and private-access experience
+- ORENZA brand system: forest green, cream, gold, green and controlled red accents
 - Sandbox Money kept separate from provider accounts
 - Live Deriv market discovery through the public `active_symbols` feed
 - Real-world Deriv markets separated from Derived/Synthetic markets
@@ -18,13 +18,13 @@ AURENZA BROKER is a private, sandbox-first trading and investment workspace with
 
 ## Market-data rule
 
-AURENZA does not hardcode or invent market availability or prices. The Markets screen reads active instruments from Deriv and displays the provider-reported state. Deriv's API exposes active symbols and real-time ticks through its WebSocket market-data endpoints. Availability can vary by country, account, and product, so the app must always show provider truth rather than promise universal availability.
+ORENZA does not hardcode or invent market availability or prices. The Markets screen reads active instruments from Deriv and displays the provider-reported state. Deriv's API exposes active symbols, and ORENZA normalizes them for display.
 
 ## Security and release boundary
 
-Provider/API credentials remain server-side. No secrets belong in the browser or Git history. REAL trading and real-money payout remain locked until the required provider credentials, permissions, reconciliation, security checks, legal/operational approvals, and end-to-end verification are complete.
+Provider/API credentials remain server-side. No secrets belong in the browser or Git history. REAL trading and real-money payout remain locked until the required provider credentials, permissions, compliance, and independent security verification are complete.
 
-The application is being tested privately and is not being published to Google Play at this stage. The preferred phone/tablet installation path is the installable PWA so devices can receive new web deployments without repeated APK downloads.
+The application is being tested privately and is not being published to Google Play at this stage. The preferred phone/tablet installation path is the installable PWA so devices can receive new versions automatically.
 
 ## Documentation
 
