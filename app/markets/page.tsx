@@ -11,7 +11,6 @@ const markets = [
 ] as const;
 
 type Quote = { symbol: string; price?: number; bid?: number; ask?: number; epoch?: number; source?: string; error?: string };
-
 type DerivTick = { msg_type?: string; tick?: { symbol?: string; quote?: number; bid?: number; ask?: number; epoch?: number }; error?: { message?: string } };
 
 const DERIV_PUBLIC_WS = 'wss://api.derivws.com/trading/v1/options/ws/public';
@@ -20,53 +19,35 @@ export default function MarketsPage() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [connected, setConnected] = useState(false);
   const [updated, setUpdated] = useState<string>('');
-
   const symbols = useMemo(() => markets.map(([symbol]) => symbol), []);
 
   useEffect(() => {
     const ws = new WebSocket(DERIV_PUBLIC_WS);
-
     ws.addEventListener('open', () => {
       setConnected(true);
-      symbols.forEach((symbol, index) => {
-        ws.send(JSON.stringify({ ticks: symbol, subscribe: 1, req_id: index + 1 }));
-      });
+      symbols.forEach((symbol, index) => ws.send(JSON.stringify({ ticks: symbol, subscribe: 1, req_id: index + 1 })));
     });
-
     ws.addEventListener('message', (event) => {
       try {
         const message = JSON.parse(String(event.data)) as DerivTick;
         if (message.error?.message) {
-          setQuotes((current) => ({ ...current, [String(message.tick?.symbol ?? '')]: { error: message.error?.message } }));
+          const symbol = message.tick?.symbol ? String(message.tick.symbol) : null;
+          if (symbol) setQuotes((current) => ({ ...current, [symbol]: { symbol, error: message.error.message } }));
           return;
         }
         if (message.msg_type !== 'tick' || !message.tick?.symbol) return;
         const tick = message.tick;
         const symbol = String(tick.symbol);
-        setQuotes((current) => ({
-          ...current,
-          [symbol]: {
-            symbol,
-            price: Number.isFinite(Number(tick.quote)) ? Number(tick.quote) : undefined,
-            bid: Number.isFinite(Number(tick.bid)) ? Number(tick.bid) : undefined,
-            ask: Number.isFinite(Number(tick.ask)) ? Number(tick.ask) : undefined,
-            epoch: tick.epoch,
-            source: 'LIVE',
-          },
-        }));
+        setQuotes((current) => ({ ...current, [symbol]: { symbol, price: Number.isFinite(Number(tick.quote)) ? Number(tick.quote) : undefined, bid: Number.isFinite(Number(tick.bid)) ? Number(tick.bid) : undefined, ask: Number.isFinite(Number(tick.ask)) ? Number(tick.ask) : undefined, epoch: tick.epoch, source: 'LIVE' } }));
         setUpdated(new Date(Number(tick.epoch) * 1000 || Date.now()).toISOString());
       } catch {
         // Ignore malformed provider messages without taking down the stream.
       }
     });
-
     ws.addEventListener('close', () => setConnected(false));
     ws.addEventListener('error', () => setConnected(false));
-
     return () => {
-      symbols.forEach((symbol) => {
-        try { ws.send(JSON.stringify({ forget_all: 'ticks' })); } catch { /* socket already closing */ }
-      });
+      try { ws.send(JSON.stringify({ forget_all: 'ticks' })); } catch { /* socket already closing */ }
       ws.close();
     };
   }, [symbols]);
