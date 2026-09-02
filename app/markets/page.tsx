@@ -11,7 +11,12 @@ const markets = [
 ] as const;
 
 type Quote = { symbol: string; price?: number; bid?: number; ask?: number; epoch?: number; source?: string; error?: string };
-type DerivTick = { msg_type?: string; tick?: { symbol?: string; quote?: number; bid?: number; ask?: number; epoch?: number }; error?: { message?: string } };
+type DerivTick = {
+  msg_type?: string;
+  req_id?: number;
+  tick?: { symbol?: string; quote?: number; bid?: number; ask?: number; epoch?: number };
+  error?: { message?: string };
+};
 
 const DERIV_PUBLIC_WS = 'wss://api.derivws.com/trading/v1/options/ws/public';
 
@@ -31,15 +36,31 @@ export default function MarketsPage() {
       try {
         const message = JSON.parse(String(event.data)) as DerivTick;
         if (message.error?.message) {
-          const symbol = message.tick?.symbol ? String(message.tick.symbol) : null;
-          if (symbol) setQuotes((current) => ({ ...current, [symbol]: { symbol, error: message.error.message } }));
+          const requestedSymbol = message.req_id ? symbols[message.req_id - 1] : undefined;
+          if (requestedSymbol) {
+            setQuotes((current) => ({
+              ...current,
+              [requestedSymbol]: { symbol: requestedSymbol, error: message.error?.message },
+            }));
+          }
           return;
         }
         if (message.msg_type !== 'tick' || !message.tick?.symbol) return;
         const tick = message.tick;
         const symbol = String(tick.symbol);
-        setQuotes((current) => ({ ...current, [symbol]: { symbol, price: Number.isFinite(Number(tick.quote)) ? Number(tick.quote) : undefined, bid: Number.isFinite(Number(tick.bid)) ? Number(tick.bid) : undefined, ask: Number.isFinite(Number(tick.ask)) ? Number(tick.ask) : undefined, epoch: tick.epoch, source: 'LIVE' } }));
-        setUpdated(new Date(Number(tick.epoch) * 1000 || Date.now()).toISOString());
+        setQuotes((current) => ({
+          ...current,
+          [symbol]: {
+            symbol,
+            price: Number.isFinite(Number(tick.quote)) ? Number(tick.quote) : undefined,
+            bid: Number.isFinite(Number(tick.bid)) ? Number(tick.bid) : undefined,
+            ask: Number.isFinite(Number(tick.ask)) ? Number(tick.ask) : undefined,
+            epoch: tick.epoch,
+            source: 'LIVE',
+          },
+        }));
+        const epochMs = Number(tick.epoch) * 1000;
+        setUpdated(new Date(Number.isFinite(epochMs) ? epochMs : Date.now()).toISOString());
       } catch {
         // Ignore malformed provider messages without taking down the stream.
       }
