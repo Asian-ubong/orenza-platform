@@ -1,3 +1,5 @@
+import { getLiveGateStatus } from '../providers/live-gates';
+
 export type MT5Environment = 'DEMO' | 'REAL';
 
 export type MT5ConnectionStatus = {
@@ -7,32 +9,56 @@ export type MT5ConnectionStatus = {
   tradingEnabled: boolean;
   marketDataEnabled: boolean;
   accountId: string | null;
+  bridgeConfigured: boolean;
+  healthChecked: boolean;
   message: string;
 };
 
-/**
- * Server-side MT5 adapter boundary.
- *
- * ORENZA deliberately does not put MT5 credentials in the browser. A real
- * implementation should connect this adapter to an approved MT5 bridge or
- * broker gateway (for example, an MT5 Expert Advisor/service or broker API)
- * and normalize account, position, order and tick events here.
- */
-export function getMT5ConnectionStatus(): MT5ConnectionStatus {
-  const configured = Boolean(
-    process.env.MT5_BRIDGE_URL &&
-    process.env.MT5_BRIDGE_TOKEN
-  );
+function getEnvironment(): MT5Environment {
+  return process.env.MT5_ENVIRONMENT === 'REAL' ? 'REAL' : 'DEMO';
+}
 
+/** Server-side MT5 bridge health check. Credentials/tokens never reach the browser. */
+export async function getMT5ConnectionStatus(): Promise<MT5ConnectionStatus> {
+  const environment = getEnvironment();
+  const bridgeConfigured = Boolean(process.env.MT5_BRIDGE_URL && process.env.MT5_BRIDGE_TOKEN);
+  const gate = getLiveGateStatus();
+
+  if (!bridgeConfigured) {
+    return {
+      provider: 'MT5', environment, connected: false,
+      tradingEnabled: false, marketDataEnabled: false,
+      accountId: process.env.MT5_ACCOUNT_ID ?? null,
+      bridgeConfigured: false, healthChecked: false,
+      message: 'MT5 bridge is not configured; add server-side bridge settings before connecting an account.',
+    };
+  }
+
+  let healthy = false;
+  try {
+    const response = await fetch(`${process.env.MT5_BRIDGE_URL!.replace(/\/$/, '')}/health`, {
+      headers: { Authorization: `Bearer ${process.env.MT5_BRIDGE_TOKEN}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
+    });
+    healthy = response.ok;
+  } catch {
+    healthy = false;
+  }
+
+  const realTradingGate = environment === 'REAL' && gate.tradingEnabled && process.env.MT5_TRADING_ENABLED === 'true';
   return {
-    provider: 'MT5',
-    environment: process.env.MT5_ENVIRONMENT === 'REAL' ? 'REAL' : 'DEMO',
-    connected: configured,
-    tradingEnabled: configured && process.env.MT5_TRADING_ENABLED === 'true',
-    marketDataEnabled: configured,
+    provider: 'MT5', environment,
+    connected: healthy,
+    tradingEnabled: healthy && realTradingGate,
+    marketDataEnabled: healthy,
     accountId: process.env.MT5_ACCOUNT_ID ?? null,
-    message: configured
-      ? 'MT5 bridge configuration detected; runtime connectivity still requires a successful bridge health check.'
-      : 'MT5 demo bridge is not configured. Add server-side bridge settings before connecting an account.',
+    bridgeConfigured: true,
+    healthChecked: true,
+    message: healthy
+      ? environment === 'REAL'
+        ? 'MT5 bridge is healthy. Real execution remains independently gated and is not enabled by health status alone.'
+        : 'MT5 demo bridge is healthy; real-money execution is unavailable in DEMO mode.'
+      : 'MT5 bridge is configured but health check failed.',
   };
 }
