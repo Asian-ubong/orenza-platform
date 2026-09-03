@@ -90,7 +90,7 @@ export async function verifyTestTransaction(reference: string): Promise<Paystack
 
 export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
   if (!signature) return false;
-  const key = process.env.PAYSTACK_WEBHOOK_SECRET ?? process.env.PAYSTACK_SECRET_KEY;
+  const key = process.env.PAYSTACK_SECRET_KEY;
   if (!key || !key.startsWith('sk_test_')) return false;
   const digest = crypto.createHmac('sha512', key).update(rawBody).digest('hex');
   const expected = Buffer.from(digest, 'utf8');
