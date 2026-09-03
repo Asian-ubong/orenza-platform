@@ -20,17 +20,27 @@ export default function LoginPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      const normalizedEmail = email.trim().toLowerCase();
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (authError) throw authError;
       if (!data.user?.email_confirmed_at) {
-        sessionStorage.setItem('orenza_pending_email', email.trim().toLowerCase());
+        sessionStorage.setItem('orenza_pending_email', normalizedEmail);
         sessionStorage.setItem('orenza_auth_flow', 'signup');
+        await supabase.auth.signOut();
         router.replace('/verify');
         return;
       }
-      sessionStorage.setItem('orenza_pending_email', email.trim().toLowerCase());
+
+      // Password is the first factor; email OTP is the second factor before the workspace opens.
+      await supabase.auth.signOut();
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: { shouldCreateUser: false },
+      });
+      if (otpError) throw otpError;
+      sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_auth_flow', 'login');
-      router.replace('/private-access');
+      router.replace('/verify');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login could not be completed.');
     } finally {
@@ -44,12 +54,13 @@ export default function LoginPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
+      const normalizedEmail = email.trim().toLowerCase();
       const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         options: { shouldCreateUser: false },
       });
       if (otpError) throw otpError;
-      sessionStorage.setItem('orenza_pending_email', email.trim().toLowerCase());
+      sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_auth_flow', 'login');
       router.replace('/verify');
     } catch (e) {
@@ -64,12 +75,12 @@ export default function LoginPage() {
       <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
       <p className="eyebrow">SECURE LOGIN</p>
       <h1>Welcome back</h1>
-      <p className="authSub">Log in with your password. If your account still needs email verification, Orenza will take you to the OTP verification chamber.</p>
-      <div className="authNotice"><LockKeyhole size={17}/><span>For passwordless re-entry, you can request a one-time email OTP instead.</span></div>
+      <p className="authSub">Enter your password first. Orenza then sends a one-time email OTP as the verification step before the account workspace opens.</p>
+      <div className="authNotice"><LockKeyhole size={17}/><span>Password verification and email OTP are separate steps. Tester authorization, KYC approval and withdrawal authorization remain separate controls.</span></div>
       <form onSubmit={login} className="authForm">
         <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
         <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" placeholder="Your password" required /></label>
-        <button className="btn full authSubmit" disabled={busy}>{busy?'Checking…':'Log in'} <ArrowRight size={17}/></button>
+        <button className="btn full authSubmit" disabled={busy}>{busy?'Checking…':'Continue to email OTP'} <ArrowRight size={17}/></button>
       </form>
       <button type="button" className="btn secondary full" onClick={sendLoginOtp} disabled={busy || !email.trim()} style={{marginTop:9}}>Send email OTP instead</button>
       {error && <div className="authError">{error}</div>}
