@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { getAdminDb, jsonError, requireUser } from '../../../../lib/paystack/server';
+import { jsonError, requireUser } from '../../../../lib/paystack/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +24,14 @@ export async function POST(request: Request) {
     const result = Array.isArray(data) ? data[0] : data;
     if (!result?.ok) return Response.json(result ?? { ok: false, error: 'TESTER_ACCESS_DENIED' }, { status: 403 });
 
-    const response = Response.json({ ok: true, access: 'TESTER', expires_at: result.expires_at, message: result.message }, { headers: { 'Cache-Control': 'no-store' } });
-    response.headers.append('Set-Cookie', `orenza_tester_access=${accessToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=1209600`);
+    const response = Response.json(
+      { ok: true, access: 'TESTER', expires_at: result.expires_at, message: result.message },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+    response.headers.append(
+      'Set-Cookie',
+      `orenza_tester_access=${accessToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3456000`,
+    );
     return response;
   } catch (error) {
     return jsonError(error, 401);
