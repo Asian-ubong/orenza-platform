@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { jsonError } from '../../../../../lib/paystack/server';
-import { requireTesterAccess } from '../../../../../lib/tester-access';
+import { jsonError } from '../../../../lib/paystack/server';
+import { requireTesterAccess } from '../../../../lib/tester-access';
 
 export const dynamic = 'force-dynamic';
 
