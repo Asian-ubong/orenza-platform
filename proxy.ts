@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const ADMIN_ROLES = new Set(['OWNER', 'ADMIN']);
 
+// These are browser-safe Supabase project identifiers. Never put a service-role secret here.
+const FALLBACK_SUPABASE_URL = 'https://snqfmhvumqpizjhqopoh.supabase.co';
+const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_mHevxxxy7xzWvcx4JxVp5w_6xgRLhVQ';
+
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request: { headers: request.headers } });
 
@@ -13,14 +17,12 @@ export async function proxy(request: NextRequest) {
 
   if (!request.nextUrl.pathname.startsWith('/admin')) return response;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
   const supabaseAnonKey = (
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    FALLBACK_SUPABASE_PUBLISHABLE_KEY
   );
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return new NextResponse('Admin access is not configured.', { status: 503 });
-  }
 
   let supabaseResponse = response;
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
