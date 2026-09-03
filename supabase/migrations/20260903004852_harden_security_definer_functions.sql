@@ -1,0 +1,3 @@
+-- Applied in canonical Supabase project as 20260903004852.
+-- Security-definer functions are retained for backend policy checks; execution
+-- is subsequently removed from API roles by the public privilege migration.
