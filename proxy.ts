@@ -13,8 +13,11 @@ export async function proxy(request: NextRequest) {
 
   if (!request.nextUrl.pathname.startsWith('/admin')) return response;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const supabaseAnonKey = (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  );
   if (!supabaseUrl || !supabaseAnonKey) {
     return new NextResponse('Admin access is not configured.', { status: 503 });
   }
