@@ -32,3 +32,12 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: Start production server
+        run: pnpm start > /tmp/orenza-next.log 2>&1 &
+
+      - name: Wait for production server
+        run: node -e "const wait=async()=>{for(let i=0;i<30;i++){try{const r=await fetch('http://127.0.0.1:3000/');if(r.ok)process.exit(0)}catch{} await new Promise(r=>setTimeout(r,1000))}process.exit(1)};wait()"
+
+      - name: E2E smoke tests
+        run: pnpm run e2e:smoke
