@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { ArrowRight, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react';
+import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowser } from '../../lib/supabase-browser';
@@ -26,22 +26,42 @@ export default function RegisterPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
+      const normalizedEmail = email.trim().toLowerCase();
       const { data, error: authError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
-        options: {
-          data: { full_name: fullName.trim(), phone: phone.trim() },
-        },
+        options: { data: { full_name: fullName.trim(), phone: phone.trim() } },
       });
       if (authError) throw authError;
+      if (!data.user) throw new Error('Account creation did not return a user.');
 
-      sessionStorage.setItem('orenza_pending_email', email.trim().toLowerCase());
+      sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
+      sessionStorage.setItem('orenza_pending_user_id', data.user.id);
       sessionStorage.setItem('orenza_auth_flow', 'signup');
 
-      if (data.session) router.replace('/private-access');
-      else router.replace('/verify');
+      if (data.session) {
+        const response = await fetch('/api/auth/email-otp/send', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, purpose: 'signup', user_id: data.user.id }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'The verification code could not be sent.');
+        sessionStorage.setItem('orenza_auth_challenge_id', result.challenge_id || '');
+        await supabase.auth.signOut();
+      } else {
+        const response = await fetch('/api/auth/email-otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: normalizedEmail, purpose: 'signup', user_id: data.user.id }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'The verification code could not be sent.');
+        sessionStorage.setItem('orenza_auth_challenge_id', result.challenge_id || '');
+      }
+      router.replace('/verify');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Registration could not be completed.');
     } finally {
@@ -54,10 +74,8 @@ export default function RegisterPage() {
       <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
       <p className="eyebrow">ACCOUNT REGISTRATION</p>
       <h1>Create your Orenza account</h1>
-      <p className="authSub">Register first. We will send a one-time verification code to your email before opening the account workspace.</p>
-
+      <p className="authSub">Register first. Orenza sends a one-time verification code using its transactional email service.</p>
       <div className="authNotice"><LockKeyhole size={17}/><span>Your password is handled by Supabase Auth. Orenza never displays or stores it in the application UI.</span></div>
-
       <form onSubmit={register} className="authForm">
         <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
         <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
