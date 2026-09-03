@@ -1,0 +1,12 @@
+{
+  "name": "ORENZA BROKER",
+  "short_name": "ORENZA",
+  "description": "Smart Trading. Secure Future.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B192B",
+  "theme_color": "#2A402D",
+  "icons": [
+    {"src":"/brand/orenza-mark.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
