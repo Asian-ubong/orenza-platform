@@ -1,5 +1,5 @@
-const CACHE = 'orenza-shell-v2';
-const APP_SHELL = ['/', '/private-access', '/provider-login', '/markets'];
+const CACHE = 'orenza-shell-v3';
+const APP_SHELL = ['/', '/login', '/register', '/verify', '/private-access', '/home', '/tester-program', '/academy', '/provider-login', '/markets'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
