@@ -1,10 +1,11 @@
-import { getAdminDb, jsonError, requireUser } from '../../../../lib/paystack/server';
+import { jsonError } from '../../../../lib/paystack/server';
+import { requireTesterAccess } from '../../../../lib/tester-access';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { db, user } = await requireUser(request);
+    const { db, user } = await requireTesterAccess(request);
     const body = await request.json().catch(() => ({}));
     const idempotencyKey = typeof body.idempotency_key === 'string' ? body.idempotency_key : `welcome:${user.id}`;
     const { data, error } = await db.rpc('orenza_issue_sandbox_welcome_bonus', {
@@ -16,13 +17,13 @@ export async function POST(request: Request) {
     if (error) throw new Error(error.message);
     return Response.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    return jsonError(error, 401);
+    return jsonError(error, 403);
   }
 }
 
 export async function GET(request: Request) {
   try {
-    const { db, user } = await requireUser(request);
+    const { db, user } = await requireTesterAccess(request);
     const { data: wallet, error: walletError } = await db
       .from('sandbox_wallets')
       .select('id,currency,balance,allocated,available_balance,reserved_balance,realized_profit,withdrawable_profit,withdrawn_profit,lifetime_profit,lifetime_loss,payout_reserved_profit,updated_at')
@@ -40,6 +41,6 @@ export async function GET(request: Request) {
     if (bonusError) throw new Error(bonusError.message);
     return Response.json({ ok: true, wallet, bonus }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    return jsonError(error, 401);
+    return jsonError(error, 403);
   }
 }
