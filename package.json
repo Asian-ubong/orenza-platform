@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "e2e:smoke": "node scripts/e2e-smoke.mjs"
+    "e2e:smoke": "node scripts/e2e-smoke.mjs",
+    "test:realtime-boundary": "node scripts/realtime-boundary-test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "latest",
