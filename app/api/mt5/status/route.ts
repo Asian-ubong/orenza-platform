@@ -4,7 +4,8 @@ import { getMT5ConnectionStatus } from '../../../../lib/mt5/adapter';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json(getMT5ConnectionStatus(), {
+  const status = await getMT5ConnectionStatus();
+  return NextResponse.json(status, {
     headers: { 'Cache-Control': 'no-store' },
   });
 }
