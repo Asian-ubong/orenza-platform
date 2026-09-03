@@ -42,6 +42,7 @@ export default function LoginPage() {
       if (!response.ok) throw new Error(result.error || 'The verification code could not be sent.');
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_auth_flow', 'login');
+      sessionStorage.setItem('orenza_auth_challenge_id', result.challenge_id || '');
       router.replace('/verify');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login could not be completed.');
