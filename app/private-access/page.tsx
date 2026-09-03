@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { ArrowRight, LockKeyhole, ShieldCheck, QrCode } from 'lucide-react';
 
 export default function PrivateAccess() {
   const [code, setCode] = useState('');
@@ -34,11 +34,15 @@ export default function PrivateAccess() {
   }
 
   return <main className="gate"><div className="gateCard wide">
-    <img className="brandHeroLogo small" style={{width:'min(300px,100%)',height:'auto',display:'block',marginBottom:22}} src="/brand/orenza-wordmark.svg" alt="ORENZA BROKER"/>
+    <img className="brandHeroLogo small" style={{width:'min(300px,100%)',height:'auto',display:'block',marginBottom:22}} src="/brand/orenza-mark.svg" alt="ORENZA"/>
     <p className="eyebrow">ORENZA · PRIVATE TESTER ACCESS</p><h1>APPROVED TESTERS ONLY</h1>
     <p>Downloading ORENZA does not grant access. An approved tester must sign in and redeem a private invitation code.</p>
-    <div className="gateNotice"><LockKeyhole size={18}/><span>Access is bound to your authenticated account and expires after the assigned 14-day test window.</span></div>
-    <label style={{display:'block',marginTop:18,fontWeight:700}}>Tester code</label>
+    <div className="gateNotice"><LockKeyhole size={18}/><span>Access is bound to your authenticated account and expires after the assigned 40-day test window.</span></div>
+    <div style={{display:'flex',gap:18,alignItems:'center',flexWrap:'wrap',marginTop:18}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontWeight:700}}><QrCode size={18}/> Private tester QR</div>
+      <span style={{opacity:.75}}>Scan the invitation link supplied by ORENZA, then redeem the code shown in your invitation.</span>
+    </div>
+    <label style={{display:'block',marginTop:18,fontWeight:700}}>Tester promo code</label>
     <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="ORENZA-XXXXXXXXXXXXXXXX" autoCapitalize="characters" style={{width:'100%',marginTop:8,padding:14,borderRadius:12,border:'1px solid rgba(255,255,255,.16)',background:'rgba(255,255,255,.05)',color:'inherit',fontSize:16,boxSizing:'border-box'}}/>
     <button className="btn full" onClick={claim} disabled={busy || !code.trim()} style={{marginTop:12,cursor:busy?'wait':'pointer'}}>{busy?'Verifying…':'Redeem tester access'} <ArrowRight size={17}/></button>
     {error && <p style={{color:'#fbbf24',marginTop:12}}>{error}</p>}
