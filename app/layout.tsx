@@ -5,6 +5,7 @@ export const metadata = {
   title: 'ORENZA BROKER — Smart Trading. Secure Future.',
   description: 'ORENZA BROKER private trading, market analysis, sandbox and connected provider workspace.',
   applicationName: 'ORENZA BROKER',
+  manifest: '/manifest.json',
   icons: {
     icon: '/brand/orenza-mark.svg',
     shortcut: '/brand/orenza-mark.svg',
