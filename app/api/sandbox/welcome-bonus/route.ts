@@ -1,4 +1,4 @@
-import { getAdminDb, jsonError, requireUser } from '../../../../../lib/paystack/server';
+import { getAdminDb, jsonError, requireUser } from '../../../../lib/paystack/server';
 
 export const dynamic = 'force-dynamic';
 
