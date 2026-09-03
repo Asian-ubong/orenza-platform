@@ -1,4 +1,4 @@
-import { jsonError, requireUser } from '../../../../../lib/paystack/server';
+import { jsonError, requireUser } from '../../../../lib/paystack/server';
 
 export const dynamic = 'force-dynamic';
 
