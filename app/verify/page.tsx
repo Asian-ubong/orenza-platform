@@ -27,25 +27,15 @@ export default function VerifyPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      // Supabase's current JS email-OTP flow verifies both signup and login
-      // codes with type: 'email'. Using 'signup' here can reject a valid code
-      // even though the signup email was sent successfully.
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token: otp.trim(),
-        type: 'email',
-      });
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type: 'email' });
       if (verifyError) throw verifyError;
       if (!data.user || !data.session) throw new Error('Verification succeeded but no authenticated session was returned.');
-
       sessionStorage.removeItem('orenza_pending_email');
       sessionStorage.removeItem('orenza_pending_name');
       sessionStorage.removeItem('orenza_pending_phone');
       sessionStorage.removeItem('orenza_pending_password');
       sessionStorage.removeItem('orenza_auth_flow');
       sessionStorage.removeItem('orenza_auth_challenge_id');
-      // Email verification ends onboarding here. KYC is intentionally deferred
-      // until the user chooses to open live trading.
       router.replace('/home');
     } catch (e) { setError(e instanceof Error ? e.message : 'The verification could not be completed.'); }
     finally { setBusy(false); }
@@ -56,9 +46,7 @@ export default function VerifyPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      const result = flow === 'signup'
-        ? await supabase.auth.resend({ type: 'signup', email })
-        : await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+      const result = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
       if (result.error) throw result.error;
       setSent(true);
     } catch (e) { setError(e instanceof Error ? e.message : 'A new verification code could not be sent.'); }
@@ -68,13 +56,13 @@ export default function VerifyPage() {
   return <main className="authCanvas"><section className="authCard otpCard">
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <div className="otpIcon"><MailCheck size={26}/></div><p className="eyebrow">AUTOMATED SECURITY VERIFICATION</p><h1>Verify your account</h1>
-    <p className="authSub">Orenza sends a unique one-time code to <strong>{email || 'your email'}</strong>. After verification, your account opens the dashboard. KYC is only required when you choose live trading.</p>
+    <p className="authSub">Orenza sends a unique 6-digit code to <strong>{email || 'your email'}</strong>. After verification, your account opens the dashboard. KYC is only required when you choose live trading.</p>
     <div className="authNotice"><ShieldCheck size={17}/><span>Email verification is automatic. Your phone number is not used for OTP delivery.</span></div>
     <form onSubmit={verify} className="authForm">
       <label>6-digit verification code<input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={6} required /></label>
       <button className="btn full authSubmit" disabled={busy || otp.length !== 6}>{busy?'Verifying…':'Verify and continue to dashboard'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}{sent && <div className="verifiedHint"><CheckCircle2 size={15}/> Check your inbox and spam folder for the newest code.</div>}
-    <button type="button" className="textButton" onClick={resend} disabled={busy}>Send a new verification code</button>
+    <button type="button" className="textButton" onClick={resend} disabled={busy}>Send a new 6-digit code</button>
   </section></main>;
 }
