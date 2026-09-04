@@ -33,15 +33,17 @@ export default function RegisterPage() {
       if (signupError) throw signupError;
       if (!data.user) throw new Error('The account could not be initialized.');
 
-      // Supabase sends the signup confirmation email from the Confirm signup
-      // template. Orenza intentionally uses that single message as the source
-      // of truth for the 6-digit onboarding OTP; do not send a second OTP here.
+      // Keep only non-secret onboarding state. The email is also placed in the
+      // URL so verification still works if the browser/PWA process clears
+      // sessionStorage while navigating between pages.
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
       sessionStorage.setItem('orenza_auth_flow', 'signup');
       sessionStorage.setItem('orenza_auth_challenge_id', `supabase:${encodeURIComponent(normalizedEmail)}:signup`);
-      router.replace('/verify');
+      localStorage.setItem('orenza_pending_email', normalizedEmail);
+      localStorage.setItem('orenza_auth_flow', 'signup');
+      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be started.'); }
     finally { setBusy(false); }
   }
