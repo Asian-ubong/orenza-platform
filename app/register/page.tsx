@@ -33,15 +33,9 @@ export default function RegisterPage() {
       if (signupError) throw signupError;
       if (!data.user) throw new Error('The account could not be initialized.');
 
-      // Registration creates the password account first, then explicitly requests
-      // the email OTP used by the verification screen. This avoids depending on
-      // a confirmation-link-only template for the six-digit onboarding flow.
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: { shouldCreateUser: false },
-      });
-      if (otpError) throw new Error(`The account was created, but the verification code could not be sent: ${otpError.message}`);
-
+      // Supabase sends the signup confirmation email from the Confirm signup
+      // template. Orenza intentionally uses that single message as the source
+      // of truth for the 6-digit onboarding OTP; do not send a second OTP here.
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
