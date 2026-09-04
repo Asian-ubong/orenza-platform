@@ -8,10 +8,18 @@ function admin() {
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 }
 
-async function sendEmail(to: string, code: string, purpose: 'signup' | 'login') {
+function publicAuth() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
+}
+
+async function sendEmail(to: string, code: string, purpose: 'signup' | 'login', fullName?: string, phone?: string) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
   if (!apiKey || !from) return false;
+  const greeting = fullName ? `Hello ${fullName},` : 'Hello,';
+  const phoneLine = phone ? `\nRegistered phone: ${phone}` : '';
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -19,7 +27,7 @@ async function sendEmail(to: string, code: string, purpose: 'signup' | 'login') 
       from,
       to: [to],
       subject: purpose === 'signup' ? 'Your Orenza verification code' : 'Your Orenza login code',
-      text: `Your Orenza one-time verification code is ${code}. It expires in 10 minutes and can only be used once. Do not share this code.`,
+      text: `${greeting}\n\nYour Orenza one-time verification code is ${code}.${phoneLine}\n\nIt expires in 10 minutes and can only be used once. Do not share this code. This code is sent by email only; Orenza does not send this verification code to your phone number.`,
     }),
   });
   return response.ok;
@@ -35,9 +43,15 @@ export async function POST(req: Request) {
     const auth = req.headers.get('authorization');
 
     let userId = '';
+    let fullName = '';
+    let phone = '';
     if (auth?.startsWith('Bearer ')) {
       const { data: { user } } = await db.auth.getUser(auth.slice(7));
-      if (user?.email?.toLowerCase() === email) userId = user.id;
+      if (user?.email?.toLowerCase() === email) {
+        userId = user.id;
+        fullName = String(user.user_metadata?.full_name || '');
+        phone = String(user.user_metadata?.phone || '');
+      }
     }
 
     if (!userId && purpose === 'signup') {
@@ -47,6 +61,8 @@ export async function POST(req: Request) {
       if (error || userData.user?.email?.toLowerCase() !== email) {
         return NextResponse.json({ error: 'Registration verification could not be initialized.' }, { status: 400 });
       }
+      fullName = String(userData.user.user_metadata?.full_name || '');
+      phone = String(userData.user.user_metadata?.phone || '');
     }
 
     if (!userId) return NextResponse.json({ error: 'Password verification is required before a login code can be sent.' }, { status: 401 });
@@ -60,6 +76,7 @@ export async function POST(req: Request) {
     await db.from('auth_email_otp_challenges').update({ consumed_at: new Date().toISOString() })
       .eq('user_id', userId).eq('purpose', purpose).is('consumed_at', null);
 
+    // Preferred delivery is Orenza's configured transactional email provider.
     const code = String(crypto.randomInt(100000, 1000000));
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
@@ -68,14 +85,27 @@ export async function POST(req: Request) {
     }).select('id,expires_at').single();
     if (insertError) return NextResponse.json({ error: 'Could not create verification challenge.' }, { status: 500 });
 
-    const sent = await sendEmail(email, code, purpose);
-    if (!sent) {
-      await db.from('auth_email_otp_challenges').update({ consumed_at: new Date().toISOString() }).eq('id', challenge.id);
-      return NextResponse.json({ error: 'Email delivery is not configured. Configure the Orenza transactional email settings and try again.' }, { status: 503 });
+    const sent = await sendEmail(email, code, purpose, fullName, phone);
+    if (sent) {
+      return NextResponse.json({ challenge_id: challenge.id, expires_at: challenge.expires_at, delivery: 'email' });
     }
 
-    return NextResponse.json({ challenge_id: challenge.id, expires_at: challenge.expires_at, delivery: 'email' });
+    // Fallback: use Supabase Auth's email OTP service. No SMS/phone delivery is used.
+    await db.from('auth_email_otp_challenges').update({ consumed_at: new Date().toISOString() }).eq('id', challenge.id);
+    const authClient = publicAuth();
+    if (!authClient) {
+      return NextResponse.json({ error: 'Email delivery is not configured. Configure Orenza email delivery or Supabase email OTP, then try again.' }, { status: 503 });
+    }
+    const { error: otpError } = await authClient.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+    if (otpError) {
+      return NextResponse.json({ error: `Email OTP could not be sent: ${otpError.message}` }, { status: 503 });
+    }
+
+    return NextResponse.json({ challenge_id: `supabase:${encodeURIComponent(email)}:${purpose}`, expires_at: new Date(Date.now() + 60 * 60_000).toISOString(), delivery: 'email' });
   } catch {
-    return NextResponse.json({ error: 'Unable to send the verification code.' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to send the verification code by email.' }, { status: 500 });
   }
 }
