@@ -1,14 +1,18 @@
 {
   "name": "orenza-platform",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "e2e:smoke": "node scripts/e2e-smoke.mjs"
+    "e2e:smoke": "node scripts/e2e-smoke.mjs",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/core": "^7.4.3",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "@zxing/browser": "latest",
@@ -18,6 +22,7 @@
     "lucide-react": "latest"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
     "typescript": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
