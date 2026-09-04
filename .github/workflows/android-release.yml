@@ -20,10 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
         with:
           node-version: 22
           cache: npm
@@ -70,9 +70,11 @@ jobs:
       - name: Collect APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/orenza-debug.apk
+          sha256sum artifacts/orenza-debug.apk > artifacts/orenza-debug.apk.sha256
+          zip -j artifacts/orenza-android-package.zip artifacts/orenza-debug.apk artifacts/orenza-debug.apk.sha256
 
-      - name: Upload backup and APK
-        uses: actions/upload-artifact@v4
+      - name: Upload backup and APK package
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
         with:
           name: orenza-android-${{ github.sha }}
           path: artifacts/
@@ -83,16 +85,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
 
       - name: Download APK artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
         with:
           name: orenza-android-${{ github.sha }}
           path: artifacts
 
       - name: Android emulator smoke test
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           arch: x86_64
@@ -121,7 +123,7 @@ jobs:
       - name: Notification
         run: |
           echo "ORENZA Android pipeline completed: PASS"
-          echo "APK and source backup are stored as workflow artifacts."
+          echo "APK, ZIP package, checksum, and source backup are stored as workflow artifacts."
           echo "Phone installation remains a physical-device step; no claim is made that the user's phone was installed automatically."
 
       - name: Approved cleanup gate
