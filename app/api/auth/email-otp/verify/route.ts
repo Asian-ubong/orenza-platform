@@ -14,11 +14,21 @@ function publicAuth() {
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 }
 
+async function issueSessionLink(db: ReturnType<typeof admin>, email: string) {
+  if (!db) return null;
+  const { data, error } = await db.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://orenza-platform.vercel.app'}/home` },
+  });
+  if (error) return null;
+  return data.properties?.action_link || null;
+}
+
 export async function POST(req: Request) {
   try {
     const db = admin();
     if (!db) return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
-    const auth = req.headers.get('authorization');
     const body = await req.json().catch(() => ({}));
     const challengeId = String(body.challenge_id || '');
     const code = String(body.code || '').trim();
@@ -26,7 +36,6 @@ export async function POST(req: Request) {
     const purpose = body.purpose === 'signup' ? 'signup' : 'login';
     if (!challengeId || !/^\d{6}$/.test(code) || !email) return NextResponse.json({ error: 'Enter the 6-digit verification code.' }, { status: 400 });
 
-    // Supabase Auth fallback challenge. The code is delivered by email only.
     if (challengeId.startsWith('supabase:')) {
       const parts = challengeId.split(':');
       const challengeEmail = parts[1] ? decodeURIComponent(parts[1]) : '';
@@ -37,19 +46,15 @@ export async function POST(req: Request) {
       if (!authClient) return NextResponse.json({ error: 'Email verification service is not configured.' }, { status: 503 });
       const { error: otpError } = await authClient.auth.verifyOtp({ email, token: code, type: 'email' });
       if (otpError) return NextResponse.json({ error: 'Incorrect or expired verification code. Request a new code and try again.' }, { status: 400 });
-
-      // The fallback OTP authenticates the email. For signup, also mark the
-      // server-created password account as email-confirmed so the next password
-      // login succeeds and the UI can move immediately into KYC.
       if (purpose === 'signup' && challengeUserId) {
         const { data: userData, error: userError } = await db.auth.admin.getUserById(challengeUserId);
-        if (userError || userData.user?.email?.toLowerCase() !== email) {
-          return NextResponse.json({ error: 'Email verified, but the registration account could not be activated.' }, { status: 500 });
-        }
+        if (userError || userData.user?.email?.toLowerCase() !== email) return NextResponse.json({ error: 'Email verified, but the registration account could not be activated.' }, { status: 500 });
         const { error: confirmError } = await db.auth.admin.updateUserById(challengeUserId, { email_confirm: true });
         if (confirmError) return NextResponse.json({ error: 'Email verified, but the registration account could not be activated.' }, { status: 500 });
       }
-      return NextResponse.json({ verified: true, purpose, delivery: 'email' });
+      const actionLink = await issueSessionLink(db, email);
+      if (!actionLink) return NextResponse.json({ error: 'Verification succeeded, but Orenza could not create the dashboard session.' }, { status: 500 });
+      return NextResponse.json({ verified: true, purpose, delivery: 'email', action_link: actionLink });
     }
 
     const { data: challenge, error } = await db.from('auth_email_otp_challenges').select('*')
@@ -67,16 +72,20 @@ export async function POST(req: Request) {
     }
 
     await db.from('auth_email_otp_challenges').update({ consumed_at: new Date().toISOString() }).eq('id', challenge.id);
-
     if (purpose === 'signup') {
       const { error: confirmError } = await db.auth.admin.updateUserById(challenge.user_id, { email_confirm: true });
       if (confirmError) return NextResponse.json({ error: 'Email verified, but the account could not be activated yet.' }, { status: 500 });
-    } else if (auth?.startsWith('Bearer ')) {
-      const { data: { user } } = await db.auth.getUser(auth.slice(7));
-      if (!user || user.id !== challenge.user_id) return NextResponse.json({ error: 'Authentication session mismatch.' }, { status: 401 });
+    } else {
+      const auth = req.headers.get('authorization');
+      if (auth?.startsWith('Bearer ')) {
+        const { data: { user } } = await db.auth.getUser(auth.slice(7));
+        if (!user || user.id !== challenge.user_id) return NextResponse.json({ error: 'Authentication session mismatch.' }, { status: 401 });
+      }
     }
 
-    return NextResponse.json({ verified: true, purpose, delivery: 'email' });
+    const actionLink = await issueSessionLink(db, email);
+    if (!actionLink) return NextResponse.json({ error: 'Verification succeeded, but Orenza could not create the dashboard session.' }, { status: 500 });
+    return NextResponse.json({ verified: true, purpose, delivery: 'email', action_link: actionLink });
   } catch {
     return NextResponse.json({ error: 'Unable to verify the email code.' }, { status: 500 });
   }
