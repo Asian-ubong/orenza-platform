@@ -1,0 +1,133 @@
+name: Orenza Android Release Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      approved_cleanup:
+        description: 'Run the optional cleanup step after a successful PASS'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-test-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.12.4 --activate
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Backup source before build
+        run: |
+          mkdir -p artifacts
+          git archive --format=tar.gz --output=artifacts/orenza-source-${GITHUB_SHA}.tar.gz HEAD
+
+      - name: Build web application
+        run: pnpm build
+
+      - name: Start production server
+        run: |
+          pnpm start > /tmp/orenza-next.log 2>&1 &
+          echo $! > /tmp/orenza-next.pid
+          for i in {1..30}; do curl -fsS http://127.0.0.1:3000/api/version && break || sleep 2; done
+
+      - name: Automated smoke tests
+        env:
+          BASE_URL: http://127.0.0.1:3000
+        run: pnpm e2e:smoke
+
+      - name: Install Android tooling
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Generate Android project and sync
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Collect APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/orenza-debug.apk
+
+      - name: Upload backup and APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: orenza-android-${{ github.sha }}
+          path: artifacts/
+          retention-days: 30
+
+  emulator-test:
+    needs: build-test-backup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: orenza-android-${{ github.sha }}
+          path: artifacts
+
+      - name: Android emulator smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb install -r artifacts/orenza-debug.apk
+            adb shell monkey -p com.orenzatech.orenza 1
+            sleep 8
+            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+            adb shell am force-stop com.orenzatech.orenza
+
+  finalize:
+    needs: [build-test-backup, emulator-test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pipeline result
+        run: |
+          if [ "${{ needs.build-test-backup.result }}" = "success" ] && [ "${{ needs.emulator-test.result }}" = "success" ]; then
+            echo "ORENZA END-TO-END PASS: code -> APK -> tests -> backup -> emulator install/launch -> verify"
+          else
+            echo "ORENZA END-TO-END FAIL: do not perform cleanup or release"
+            exit 1
+          fi
+
+      - name: Notification
+        run: |
+          echo "ORENZA Android pipeline completed: PASS"
+          echo "APK and source backup are stored as workflow artifacts."
+          echo "Phone installation remains a physical-device step; no claim is made that the user's phone was installed automatically."
+
+      - name: Approved cleanup gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.approved_cleanup == true }}
+        run: echo "Approved cleanup requested; no source/destructive cleanup is performed by this pipeline."
+
+      - name: Restore instruction after failed run
+        if: ${{ failure() }}
+        run: echo "Restore from the uploaded source backup artifact for this run before retrying."
