@@ -36,8 +36,14 @@ export default function VerifyPage() {
       const supabase = getSupabaseBrowser();
       const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
       if (loginError) throw loginError;
+      const invitedTester = sessionStorage.getItem('orenza_pending_tester_code');
+      const inviteSource = sessionStorage.getItem('orenza_invite_source');
       sessionStorage.removeItem('orenza_pending_email'); sessionStorage.removeItem('orenza_auth_flow'); sessionStorage.removeItem('orenza_auth_challenge_id'); sessionStorage.removeItem('orenza_pending_user_id');
-      router.replace('/private-access');
+      if (invitedTester && inviteSource === 'scanner') {
+        router.replace('/private-access?source=scanner');
+      } else {
+        router.replace('/home');
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'The verification could not be completed.'); }
     finally { setBusy(false); }
   }
