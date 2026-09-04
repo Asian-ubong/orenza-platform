@@ -27,13 +27,16 @@ export default function VerifyPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
+      // Supabase's current JS email-OTP flow verifies both signup and login
+      // codes with type: 'email'. Using 'signup' here can reject a valid code
+      // even though the signup email was sent successfully.
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token: otp.trim(),
-        type: flow === 'signup' ? 'signup' : 'email',
+        type: 'email',
       });
       if (verifyError) throw verifyError;
-      if (!data.user) throw new Error('Verification succeeded but no authenticated account was returned.');
+      if (!data.user || !data.session) throw new Error('Verification succeeded but no authenticated session was returned.');
 
       sessionStorage.removeItem('orenza_pending_email');
       sessionStorage.removeItem('orenza_pending_name');
@@ -53,8 +56,10 @@ export default function VerifyPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      const { error: resendError } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: flow === 'signup' } });
-      if (resendError) throw resendError;
+      const result = flow === 'signup'
+        ? await supabase.auth.resend({ type: 'signup', email })
+        : await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+      if (result.error) throw result.error;
       setSent(true);
     } catch (e) { setError(e instanceof Error ? e.message : 'A new verification code could not be sent.'); }
     finally { setBusy(false); }
