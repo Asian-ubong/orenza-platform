@@ -27,16 +27,12 @@ export default function RegisterPage() {
       const supabase = getSupabaseBrowser();
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: normalizedEmail,
-        options: {
-          shouldCreateUser: true,
-          data: { full_name: fullName.trim(), phone: phone.trim() },
-        },
+        options: { shouldCreateUser: true, data: { full_name: fullName.trim(), phone: phone.trim() } },
       });
       if (otpError) throw otpError;
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
-      sessionStorage.setItem('orenza_pending_password', password);
       sessionStorage.setItem('orenza_auth_flow', 'signup');
       sessionStorage.setItem('orenza_auth_challenge_id', `supabase:${encodeURIComponent(normalizedEmail)}:signup`);
       router.replace('/verify');
@@ -48,7 +44,7 @@ export default function RegisterPage() {
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
     <p className="authSub">Create your account and receive a unique one-time verification code by email. After verification, Orenza opens the dashboard; KYC is only required when you choose live trading.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is kept only in this registration flow until verification and is then stored by Supabase Auth. Orenza never displays it back to you.</span></div>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is never saved in browser storage. You will confirm it on the verification screen before the dashboard opens.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
