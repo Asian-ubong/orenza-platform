@@ -31,11 +31,24 @@ export async function POST(req: Request) {
       const parts = challengeId.split(':');
       const challengeEmail = parts[1] ? decodeURIComponent(parts[1]) : '';
       const challengePurpose = parts[2] || '';
+      const challengeUserId = parts[3] || '';
       if (challengeEmail !== email || challengePurpose !== purpose) return NextResponse.json({ error: 'This verification session does not match the registered email.' }, { status: 400 });
       const authClient = publicAuth();
       if (!authClient) return NextResponse.json({ error: 'Email verification service is not configured.' }, { status: 503 });
       const { error: otpError } = await authClient.auth.verifyOtp({ email, token: code, type: 'email' });
       if (otpError) return NextResponse.json({ error: 'Incorrect or expired verification code. Request a new code and try again.' }, { status: 400 });
+
+      // The fallback OTP authenticates the email. For signup, also mark the
+      // server-created password account as email-confirmed so the next password
+      // login succeeds and the UI can move immediately into KYC.
+      if (purpose === 'signup' && challengeUserId) {
+        const { data: userData, error: userError } = await db.auth.admin.getUserById(challengeUserId);
+        if (userError || userData.user?.email?.toLowerCase() !== email) {
+          return NextResponse.json({ error: 'Email verified, but the registration account could not be activated.' }, { status: 500 });
+        }
+        const { error: confirmError } = await db.auth.admin.updateUserById(challengeUserId, { email_confirm: true });
+        if (confirmError) return NextResponse.json({ error: 'Email verified, but the registration account could not be activated.' }, { status: 500 });
+      }
       return NextResponse.json({ verified: true, purpose, delivery: 'email' });
     }
 
