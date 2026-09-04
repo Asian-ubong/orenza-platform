@@ -24,55 +24,49 @@ export default function RegisterPage() {
     try {
       setBusy(true);
       const normalizedEmail = email.trim().toLowerCase();
-      const supabase = getSupabaseBrowser();
-      const { data, error: signupError } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password,
-        options: { data: { full_name: fullName.trim(), phone: phone.trim() } },
-      });
-      if (signupError) throw signupError;
-      if (!data.user) throw new Error('The account could not be initialized.');
 
-      // Orenza owns the OTP delivery path so the verification flow does not
-      // depend on Supabase's restricted default SMTP service.
-      const sendResponse = await fetch('/api/auth/email-otp/send', {
+      // Registration is now the complete authentication step for the test
+      // environment. No email OTP is requested or sent here.
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, purpose: 'signup', user_id: data.user.id }),
+        body: JSON.stringify({ full_name: fullName.trim(), email: normalizedEmail, phone: phone.trim(), password }),
       });
-      const sendResult = await sendResponse.json().catch(() => ({}));
-      if (!sendResponse.ok) throw new Error(sendResult.error || 'The verification code could not be sent.');
-      const challengeId = String(sendResult.challenge_id || '');
-      if (!challengeId) throw new Error('The verification challenge was not created.');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Registration could not be completed.');
+
+      const supabase = getSupabaseBrowser();
+      const { error: loginError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+      if (loginError) throw loginError;
 
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
       sessionStorage.setItem('orenza_auth_flow', 'signup');
-      sessionStorage.setItem('orenza_auth_challenge_id', challengeId);
       localStorage.setItem('orenza_pending_email', normalizedEmail);
       localStorage.setItem('orenza_auth_flow', 'signup');
-      localStorage.setItem('orenza_auth_challenge_id', challengeId);
-      localStorage.setItem('orenza_pending_user_id', data.user.id);
-      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup&challenge=${encodeURIComponent(challengeId)}`);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be started.'); }
+      localStorage.setItem('orenza_pending_user_id', String(result.user_id || ''));
+
+      // Required test sequence: Register → Promotion QR scanner.
+      router.replace('/promotion');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be completed.'); }
     finally { setBusy(false); }
   }
 
   return <main className="authCanvas"><section className="authCard">
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
-    <p className="authSub">Create your account and receive a unique 6-digit verification code by email. After verification, Orenza opens the dashboard; KYC is only required when you choose live trading.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is handled by Supabase Auth. It is never saved in browser storage. Email verification is required before the dashboard opens.</span></div>
+    <p className="authSub">Enter your name, email, phone number and password. Registration takes you directly to the approved promotion QR scanner.</p>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Email OTP verification is disabled for this test flow. Your password is never saved in browser storage.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
       <label>Phone number<input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="+234 ..." required /></label>
       <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} required /></label>
-      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account and sending code…':'Register'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account…':'Register'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">Already registered? <Link href="/login">Log in</Link></div>
-    <div className="splashTrust"><ShieldCheck size={16}/><span>Verification is email-only. After verification, you go directly to the dashboard.</span></div>
+    <div className="splashTrust"><ShieldCheck size={16}/><span>After registration, you go directly to promotion access. KYC remains a live-trading gate.</span></div>
   </section></main>;
 }
