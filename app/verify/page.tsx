@@ -42,7 +42,9 @@ export default function VerifyPage() {
       sessionStorage.removeItem('orenza_pending_user_id');
       sessionStorage.removeItem('orenza_auth_flow');
       sessionStorage.removeItem('orenza_auth_challenge_id');
-      router.replace('/kyc');
+      // Account verification ends onboarding here. KYC is intentionally deferred
+      // until the user chooses to open live trading.
+      router.replace('/home');
     } catch (e) { setError(e instanceof Error ? e.message : 'The verification could not be completed.'); }
     finally { setBusy(false); }
   }
@@ -67,7 +69,7 @@ export default function VerifyPage() {
     <form onSubmit={verify} className="authForm">
       <label>6-digit verification code<input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={6} required /></label>
       <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" placeholder="Your password" required /></label>
-      <button className="btn full authSubmit" disabled={busy || otp.length !== 6 || !password || !challengeId}>{busy?'Verifying…':'Verify and continue to KYC'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy || otp.length !== 6 || !password || !challengeId}>{busy?'Verifying…':'Verify and continue to dashboard'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}{sent && <div className="verifiedHint"><CheckCircle2 size={15}/> Check your inbox and spam folder for the newest code.</div>}
     <button type="button" className="textButton" onClick={resend} disabled={busy}>Send a new verification code</button>
