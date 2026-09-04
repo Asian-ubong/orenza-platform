@@ -62,6 +62,21 @@ jobs:
 
       - name: Install Android tooling
         run: |
+          set -euxo pipefail
+          if ! command -v sdkmanager >/dev/null 2>&1; then
+            for candidate in \
+              "$ANDROID_HOME/cmdline-tools/latest/bin" \
+              "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" \
+              "/opt/android-sdk/cmdline-tools/latest/bin" \
+              "/usr/local/lib/android/sdk/cmdline-tools/latest/bin"; do
+              if [ -x "$candidate/sdkmanager" ]; then
+                echo "$candidate" >> "$GITHUB_PATH"
+                export PATH="$candidate:$PATH"
+                break
+              fi
+            done
+          fi
+          command -v sdkmanager
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
