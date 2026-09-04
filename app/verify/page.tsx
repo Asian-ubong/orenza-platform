@@ -2,11 +2,10 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { ArrowRight, CheckCircle2, MailCheck, ShieldCheck } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export default function VerifyPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [challengeId, setChallengeId] = useState('');
@@ -17,14 +16,15 @@ export default function VerifyPage() {
   const [flow, setFlow] = useState<'signup'|'login'>('signup');
 
   useEffect(() => {
-    const fromUrl = (searchParams.get('email') || '').trim().toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = (params.get('email') || '').trim().toLowerCase();
     const savedSession = (sessionStorage.getItem('orenza_pending_email') || '').trim().toLowerCase();
     const savedLocal = (localStorage.getItem('orenza_pending_email') || '').trim().toLowerCase();
     const resolvedEmail = fromUrl || savedSession || savedLocal;
-    const urlFlow = searchParams.get('flow') === 'login' ? 'login' : '';
+    const urlFlow = params.get('flow') === 'login' ? 'login' : '';
     const savedFlow = sessionStorage.getItem('orenza_auth_flow') === 'login' || localStorage.getItem('orenza_auth_flow') === 'login' ? 'login' : 'signup';
     const resolvedFlow = urlFlow || savedFlow;
-    const resolvedChallenge = searchParams.get('challenge') || sessionStorage.getItem('orenza_auth_challenge_id') || localStorage.getItem('orenza_auth_challenge_id') || '';
+    const resolvedChallenge = params.get('challenge') || sessionStorage.getItem('orenza_auth_challenge_id') || localStorage.getItem('orenza_auth_challenge_id') || '';
     const resolvedUser = sessionStorage.getItem('orenza_pending_user_id') || localStorage.getItem('orenza_pending_user_id') || '';
     setEmail(resolvedEmail); setFlow(resolvedFlow); setChallengeId(resolvedChallenge); setUserId(resolvedUser);
     if (resolvedEmail) {
@@ -37,7 +37,7 @@ export default function VerifyPage() {
       sessionStorage.setItem('orenza_auth_challenge_id', resolvedChallenge);
       localStorage.setItem('orenza_auth_challenge_id', resolvedChallenge);
     }
-  }, [searchParams]);
+  }, []);
 
   async function verify(event: FormEvent) {
     event.preventDefault(); setError('');
