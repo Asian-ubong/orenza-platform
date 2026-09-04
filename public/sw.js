@@ -1,4 +1,4 @@
-const CACHE = 'orenza-shell-v5';
+const CACHE = 'orenza-shell-v6';
 const APP_SHELL = ['/', '/login', '/register', '/verify', '/promotion', '/private-access', '/home', '/tester-program', '/academy', '/provider-login', '/markets'];
 
 self.addEventListener('install', event => {
