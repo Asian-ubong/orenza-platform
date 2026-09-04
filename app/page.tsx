@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Camera, QrCode, X } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 function extractInvite(raw: string) {
   try {
@@ -15,7 +15,6 @@ function extractInvite(raw: string) {
 
 export default function Splash() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [revealed, setRevealed] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
@@ -24,14 +23,14 @@ export default function Splash() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => setRevealed(true), 650);
-    const invite = searchParams.get('code')?.trim().toUpperCase();
+    const invite = new URLSearchParams(window.location.search).get('code')?.trim().toUpperCase();
     if (invite) {
       sessionStorage.setItem('orenza_pending_tester_code', invite);
       sessionStorage.setItem('orenza_invite_source', 'scanner');
       window.setTimeout(() => router.replace('/login?from=scanner'), 900);
     }
     return () => window.clearTimeout(timer);
-  }, [router, searchParams]);
+  }, [router]);
 
   function stopScanner() {
     streamRef.current?.getTracks().forEach(track => track.stop());
