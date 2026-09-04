@@ -23,22 +23,10 @@ export default function LoginPage() {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (authError) throw authError;
       if (!data.user) throw new Error('Login could not be verified.');
-      if (!data.user.email_confirmed_at) {
-        const { error: otpError } = await supabase.auth.signInWithOtp({ email: normalizedEmail, options: { shouldCreateUser: false } });
-        if (otpError) throw otpError;
-        sessionStorage.setItem('orenza_pending_email', normalizedEmail);
-        sessionStorage.setItem('orenza_auth_flow', 'signup');
-        sessionStorage.setItem('orenza_auth_challenge_id', `supabase:${encodeURIComponent(normalizedEmail)}:signup`);
-        await supabase.auth.signOut();
-        router.replace('/verify');
-        return;
-      }
-
       const { error: otpError } = await supabase.auth.signInWithOtp({ email: normalizedEmail, options: { shouldCreateUser: false } });
       if (otpError) throw otpError;
       await supabase.auth.signOut();
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
-      sessionStorage.setItem('orenza_pending_password', password);
       sessionStorage.setItem('orenza_auth_flow', 'login');
       sessionStorage.setItem('orenza_auth_challenge_id', `supabase:${encodeURIComponent(normalizedEmail)}:login`);
       router.replace('/verify');
