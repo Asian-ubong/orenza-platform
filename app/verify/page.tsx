@@ -25,26 +25,22 @@ export default function VerifyPage() {
   async function verify(event: FormEvent) {
     event.preventDefault(); setError('');
     if (!email || !/^\d{6}$/.test(otp.trim())) return setError('Enter the current 6-digit code from your Orenza email.');
-    if (flow === 'signup' && password.length < 8) return setError('Enter the password you chose during registration (at least 8 characters).');
+    if (flow === 'signup' && password.length < 8) return setError('Enter the password you chose during registration.');
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      let { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type: 'email' });
-      if (verifyError && flow === 'signup') {
-        const retry = await supabase.auth.verifyOtp({ email, token: otp.trim(), type: 'signup' });
-        data = retry.data; verifyError = retry.error;
-      }
+      const type = flow === 'signup' ? 'signup' : 'email';
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type });
       if (verifyError) throw verifyError;
-      if (!data.user) throw new Error('The verification succeeded but no authenticated account was returned.');
+      if (!data.user) throw new Error('Verification succeeded but no authenticated account was returned.');
 
       if (flow === 'signup') {
-        const name = sessionStorage.getItem('orenza_pending_name') || '';
-        const phone = sessionStorage.getItem('orenza_pending_phone') || '';
-        const { error: updateError } = await supabase.auth.updateUser({
-          password,
-          data: { full_name: name, phone },
-        });
-        if (updateError) throw updateError;
+        // The password was collected on the registration screen and deliberately
+        // not persisted. Re-authenticate with it after the email is confirmed.
+        await supabase.auth.signOut();
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+        if (loginError) throw loginError;
+        if (!loginData.user) throw new Error('Account password could not be verified.');
       }
 
       sessionStorage.removeItem('orenza_pending_email');
@@ -63,10 +59,7 @@ export default function VerifyPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      const { error: resendError } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: flow === 'signup' },
-      });
+      const { error: resendError } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: flow === 'signup' } });
       if (resendError) throw resendError;
       setSent(true);
     } catch (e) { setError(e instanceof Error ? e.message : 'A new verification code could not be sent.'); }
