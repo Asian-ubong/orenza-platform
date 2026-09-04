@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 
 function admin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  return url && key ? createClient(url, key, { auth: { persistSession: false } }) : null;
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 }
 
 async function sendEmail(to: string, code: string, purpose: 'signup' | 'login') {
