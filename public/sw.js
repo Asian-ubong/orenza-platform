@@ -1,10 +1,11 @@
-const CACHE = 'orenza-shell-v7';
+const CACHE = 'orenza-shell-v8';
 const APP_SHELL = ['/', '/login', '/register', '/verify', '/promotion', '/private-access', '/home', '/tester-program', '/academy', '/provider-login', '/markets'];
+const NETWORK_ONLY = new Set(['/login', '/register', '/verify', '/promotion', '/private-access']);
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE)
-      .then(cache => cache.addAll(APP_SHELL))
+      .then(cache => cache.addAll(APP_SHELL.filter(path => !NETWORK_ONLY.has(path))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -27,6 +28,13 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) return;
+
+  // Authentication screens must always come from the current deployment.
+  // Never fall back to an old cached auth page after a deployment.
+  if (NETWORK_ONLY.has(url.pathname)) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   event.respondWith(
     fetch(request)
