@@ -2,6 +2,10 @@ const base = (process.env.E2E_BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/
 
 const checks = [
   ['home', '/', 200],
+  ['register', '/register', 200],
+  ['login', '/login', 200],
+  ['verify', '/verify', 200],
+  ['promotion', '/promotion', 200],
   ['private access', '/private-access', 200],
   ['provider login', '/provider-login', 200],
   ['security check', '/security-check', 200],
