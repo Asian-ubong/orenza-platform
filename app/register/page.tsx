@@ -25,11 +25,13 @@ export default function RegisterPage() {
       setBusy(true);
       const normalizedEmail = email.trim().toLowerCase();
       const supabase = getSupabaseBrowser();
-      const { error: otpError } = await supabase.auth.signInWithOtp({
+      const { data, error: signupError } = await supabase.auth.signUp({
         email: normalizedEmail,
-        options: { shouldCreateUser: true, data: { full_name: fullName.trim(), phone: phone.trim() } },
+        password,
+        options: { data: { full_name: fullName.trim(), phone: phone.trim() } },
       });
-      if (otpError) throw otpError;
+      if (signupError) throw signupError;
+      if (!data.user) throw new Error('The account could not be initialized.');
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
@@ -44,13 +46,13 @@ export default function RegisterPage() {
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
     <p className="authSub">Create your account and receive a unique one-time verification code by email. After verification, Orenza opens the dashboard; KYC is only required when you choose live trading.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is never saved in browser storage. You will confirm it on the verification screen before the dashboard opens.</span></div>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is handled by Supabase Auth. It is never saved in browser storage. Email verification is required before the dashboard opens.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
       <label>Phone number<input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="+234 ..." required /></label>
       <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} required /></label>
-      <button className="btn full authSubmit" disabled={busy}>{busy?'Sending verification code…':'Register'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account…':'Register'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">Already registered? <Link href="/login">Log in</Link></div>
