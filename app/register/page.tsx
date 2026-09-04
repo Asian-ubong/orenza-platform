@@ -33,17 +33,28 @@ export default function RegisterPage() {
       if (signupError) throw signupError;
       if (!data.user) throw new Error('The account could not be initialized.');
 
-      // Keep only non-secret onboarding state. The email is also placed in the
-      // URL so verification still works if the browser/PWA process clears
-      // sessionStorage while navigating between pages.
+      // Orenza owns the OTP delivery path so the verification flow does not
+      // depend on Supabase's restricted default SMTP service.
+      const sendResponse = await fetch('/api/auth/email-otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, purpose: 'signup', user_id: data.user.id }),
+      });
+      const sendResult = await sendResponse.json().catch(() => ({}));
+      if (!sendResponse.ok) throw new Error(sendResult.error || 'The verification code could not be sent.');
+      const challengeId = String(sendResult.challenge_id || '');
+      if (!challengeId) throw new Error('The verification challenge was not created.');
+
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
       sessionStorage.setItem('orenza_auth_flow', 'signup');
-      sessionStorage.setItem('orenza_auth_challenge_id', `supabase:${encodeURIComponent(normalizedEmail)}:signup`);
+      sessionStorage.setItem('orenza_auth_challenge_id', challengeId);
       localStorage.setItem('orenza_pending_email', normalizedEmail);
       localStorage.setItem('orenza_auth_flow', 'signup');
-      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
+      localStorage.setItem('orenza_auth_challenge_id', challengeId);
+      localStorage.setItem('orenza_pending_user_id', data.user.id);
+      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup&challenge=${encodeURIComponent(challengeId)}`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be started.'); }
     finally { setBusy(false); }
   }
@@ -58,7 +69,7 @@ export default function RegisterPage() {
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
       <label>Phone number<input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="+234 ..." required /></label>
       <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} required /></label>
-      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account…':'Register'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account and sending code…':'Register'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">Already registered? <Link href="/login">Log in</Link></div>
