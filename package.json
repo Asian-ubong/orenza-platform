@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
+    "@zxing/browser": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
