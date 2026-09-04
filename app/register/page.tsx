@@ -32,6 +32,16 @@ export default function RegisterPage() {
       });
       if (signupError) throw signupError;
       if (!data.user) throw new Error('The account could not be initialized.');
+
+      // Registration creates the password account first, then explicitly requests
+      // the email OTP used by the verification screen. This avoids depending on
+      // a confirmation-link-only template for the six-digit onboarding flow.
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: { shouldCreateUser: false },
+      });
+      if (otpError) throw new Error(`The account was created, but the verification code could not be sent: ${otpError.message}`);
+
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
@@ -45,7 +55,7 @@ export default function RegisterPage() {
   return <main className="authCanvas"><section className="authCard">
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
-    <p className="authSub">Create your account and receive a unique one-time verification code by email. After verification, Orenza opens the dashboard; KYC is only required when you choose live trading.</p>
+    <p className="authSub">Create your account and receive a unique 6-digit verification code by email. After verification, Orenza opens the dashboard; KYC is only required when you choose live trading.</p>
     <div className="authNotice"><LockKeyhole size={17}/><span>Your password is handled by Supabase Auth. It is never saved in browser storage. Email verification is required before the dashboard opens.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
