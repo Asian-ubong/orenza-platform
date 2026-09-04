@@ -25,26 +25,18 @@ export async function POST(req: Request) {
     const already = existing.users.find((u) => u.email?.toLowerCase() === email);
     if (already) return NextResponse.json({ error: 'An account with this email already exists. Log in instead.' }, { status: 409 });
 
+    // Test/pilot authentication: confirm the account immediately. Email OTP
+    // delivery is deliberately disabled. Live-trading authorization remains
+    // separately gated by KYC and the production risk controls.
     const { data, error } = await db.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { full_name: fullName, phone },
     });
     if (error || !data.user) return NextResponse.json({ error: error?.message || 'Account creation failed.' }, { status: 400 });
 
-    const response = await fetch(new URL('/api/auth/email-otp/send', req.url), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, purpose: 'signup', user_id: data.user.id }),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      await db.auth.admin.deleteUser(data.user.id);
-      return NextResponse.json({ error: result.error || 'The verification code could not be sent.' }, { status: response.status });
-    }
-
-    return NextResponse.json({ user_id: data.user.id, challenge_id: result.challenge_id, expires_at: result.expires_at });
+    return NextResponse.json({ user_id: data.user.id, authenticated: true, otp_required: false });
   } catch {
     return NextResponse.json({ error: 'Registration could not be completed.' }, { status: 500 });
   }
