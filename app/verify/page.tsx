@@ -46,7 +46,9 @@ export default function VerifyPage() {
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      const result = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+      const result = flow === 'signup'
+        ? await supabase.auth.resend({ type: 'signup', email })
+        : await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
       if (result.error) throw result.error;
       setSent(true);
     } catch (e) { setError(e instanceof Error ? e.message : 'A new verification code could not be sent.'); }
