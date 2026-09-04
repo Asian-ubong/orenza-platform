@@ -9,7 +9,6 @@ export default function VerifyPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(true);
@@ -25,23 +24,16 @@ export default function VerifyPage() {
   async function verify(event: FormEvent) {
     event.preventDefault(); setError('');
     if (!email || !/^\d{6}$/.test(otp.trim())) return setError('Enter the current 6-digit code from your Orenza email.');
-    if (flow === 'signup' && password.length < 8) return setError('Enter the password you chose during registration.');
     try {
       setBusy(true);
       const supabase = getSupabaseBrowser();
-      const type = flow === 'signup' ? 'signup' : 'email';
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type });
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: otp.trim(),
+        type: flow === 'signup' ? 'signup' : 'email',
+      });
       if (verifyError) throw verifyError;
       if (!data.user) throw new Error('Verification succeeded but no authenticated account was returned.');
-
-      if (flow === 'signup') {
-        // The password was collected on the registration screen and deliberately
-        // not persisted. Re-authenticate with it after the email is confirmed.
-        await supabase.auth.signOut();
-        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-        if (loginError) throw loginError;
-        if (!loginData.user) throw new Error('Account password could not be verified.');
-      }
 
       sessionStorage.removeItem('orenza_pending_email');
       sessionStorage.removeItem('orenza_pending_name');
@@ -49,6 +41,8 @@ export default function VerifyPage() {
       sessionStorage.removeItem('orenza_pending_password');
       sessionStorage.removeItem('orenza_auth_flow');
       sessionStorage.removeItem('orenza_auth_challenge_id');
+      // Email verification ends onboarding here. KYC is intentionally deferred
+      // until the user chooses to open live trading.
       router.replace('/home');
     } catch (e) { setError(e instanceof Error ? e.message : 'The verification could not be completed.'); }
     finally { setBusy(false); }
@@ -73,8 +67,7 @@ export default function VerifyPage() {
     <div className="authNotice"><ShieldCheck size={17}/><span>Email verification is automatic. Your phone number is not used for OTP delivery.</span></div>
     <form onSubmit={verify} className="authForm">
       <label>6-digit verification code<input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" maxLength={6} required /></label>
-      {flow === 'signup' && <label>Confirm password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} required /></label>}
-      <button className="btn full authSubmit" disabled={busy || otp.length !== 6 || (flow === 'signup' && password.length < 8)}>{busy?'Verifying…':'Verify and continue to dashboard'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy || otp.length !== 6}>{busy?'Verifying…':'Verify and continue to dashboard'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}{sent && <div className="verifiedHint"><CheckCircle2 size={15}/> Check your inbox and spam folder for the newest code.</div>}
     <button type="button" className="textButton" onClick={resend} disabled={busy}>Send a new verification code</button>
