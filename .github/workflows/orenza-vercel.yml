@@ -13,30 +13,65 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  VERCEL_ORG_ID: team_1gfKzIjKOzJ3WjsUa6Ih472a
-  VERCEL_PROJECT_ID: prj_U4u2lufG7A7CvBuRVOOJXscQ4Guo
+  PRODUCTION_URL: https://orenza-platform.vercel.app
 
 jobs:
-  deploy-production:
+  verify-production:
     runs-on: ubuntu-latest
-    environment: production
     steps:
-      - name: Checkout Orenza
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify production deployment
+        run: |
+          set -euo pipefail
+          echo "Checking ${PRODUCTION_URL}"
+          status=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 30 "${PRODUCTION_URL}/")
+          echo "HTTP status: ${status}"
+          case "${status}" in
+            2*) ;;
+            3*) echo "Unexpected redirect status from production"; exit 1 ;;
+            *) echo "Production health check failed"; exit 1 ;;
+          esac
 
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 24
+      - name: Verify critical routes
+        run: |
+          set -euo pipefail
+          routes=(
+            /private-access
+            /provider-login
+            /security-check
+            /sandbox
+            /markets
+            /ai-premium
+            /trade
+            /trade/confirm
+            /portfolio
+            /wallet
+            /profit-units
+            /payout
+            /payout/security
+            /payout-history
+            /activity
+            /settings
+            /announcements
+            /events
+            /videos
+            /verify
+            /api/version
+          )
+          for route in "${routes[@]}"; do
+            status=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 30 "${PRODUCTION_URL}${route}")
+            echo "${route}: ${status}"
+            case "${status}" in
+              2*) ;;
+              *) echo "Route check failed: ${route}"; exit 1 ;;
+            esac
+          done
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel production environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Vercel artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy prebuilt artifacts to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Verify anonymous admin protection
+        run: |
+          set -euo pipefail
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${PRODUCTION_URL}/admin")
+          echo "/admin: ${status}"
+          case "${status}" in
+            301|302|303|307|308|401|403|503) ;;
+            *) echo "Admin route may be anonymously exposed"; exit 1 ;;
+          esac
