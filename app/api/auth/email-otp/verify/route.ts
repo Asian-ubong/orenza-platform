@@ -8,6 +8,12 @@ function admin() {
   return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
 }
 
+function publicAuth() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return url && key ? createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }) : null;
+}
+
 export async function POST(req: Request) {
   try {
     const db = admin();
@@ -19,6 +25,19 @@ export async function POST(req: Request) {
     const email = String(body.email || '').trim().toLowerCase();
     const purpose = body.purpose === 'signup' ? 'signup' : 'login';
     if (!challengeId || !/^\d{6}$/.test(code) || !email) return NextResponse.json({ error: 'Enter the 6-digit verification code.' }, { status: 400 });
+
+    // Supabase Auth fallback challenge. The code is delivered by email only.
+    if (challengeId.startsWith('supabase:')) {
+      const parts = challengeId.split(':');
+      const challengeEmail = parts[1] ? decodeURIComponent(parts[1]) : '';
+      const challengePurpose = parts[2] || '';
+      if (challengeEmail !== email || challengePurpose !== purpose) return NextResponse.json({ error: 'This verification session does not match the registered email.' }, { status: 400 });
+      const authClient = publicAuth();
+      if (!authClient) return NextResponse.json({ error: 'Email verification service is not configured.' }, { status: 503 });
+      const { error: otpError } = await authClient.auth.verifyOtp({ email, token: code, type: 'email' });
+      if (otpError) return NextResponse.json({ error: 'Incorrect or expired verification code. Request a new code and try again.' }, { status: 400 });
+      return NextResponse.json({ verified: true, purpose, delivery: 'email' });
+    }
 
     const { data: challenge, error } = await db.from('auth_email_otp_challenges').select('*')
       .eq('id', challengeId).eq('email', email).eq('purpose', purpose).maybeSingle();
@@ -44,8 +63,8 @@ export async function POST(req: Request) {
       if (!user || user.id !== challenge.user_id) return NextResponse.json({ error: 'Authentication session mismatch.' }, { status: 401 });
     }
 
-    return NextResponse.json({ verified: true, purpose });
+    return NextResponse.json({ verified: true, purpose, delivery: 'email' });
   } catch {
-    return NextResponse.json({ error: 'Unable to verify the code.' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to verify the email code.' }, { status: 500 });
   }
 }
