@@ -20,17 +20,26 @@ async function sendEmail(to: string, code: string, purpose: 'signup' | 'login', 
   if (!apiKey || !from) return false;
   const greeting = fullName ? `Hello ${fullName},` : 'Hello,';
   const phoneLine = phone ? `\nRegistered phone: ${phone}` : '';
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: purpose === 'signup' ? 'Your Orenza verification code' : 'Your Orenza login code',
-      text: `${greeting}\n\nYour Orenza one-time verification code is ${code}.${phoneLine}\n\nIt expires in 10 minutes and can only be used once. Do not share this code. This code is sent by email only; Orenza does not send this verification code to your phone number.`,
-    }),
-  });
-  return response.ok;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4500);
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: purpose === 'signup' ? 'Your Orenza verification code' : 'Your Orenza login code',
+        text: `${greeting}\n\nYour Orenza one-time verification code is ${code}.${phoneLine}\n\nIt expires in 10 minutes and can only be used once. Do not share this code. This code is sent by email only; Orenza does not send this verification code to your phone number.`,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function POST(req: Request) {
@@ -76,7 +85,8 @@ export async function POST(req: Request) {
     await db.from('auth_email_otp_challenges').update({ consumed_at: new Date().toISOString() })
       .eq('user_id', userId).eq('purpose', purpose).is('consumed_at', null);
 
-    // Preferred delivery is Orenza's configured transactional email provider.
+    // Security rule: OTPs are generated with the operating system's cryptographically secure RNG.
+    // AI is never used as the entropy source for authentication codes.
     const code = String(crypto.randomInt(100000, 1000000));
     const codeHash = crypto.createHash('sha256').update(code).digest('hex');
     const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
@@ -104,7 +114,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Email OTP could not be sent: ${otpError.message}` }, { status: 503 });
     }
 
-    return NextResponse.json({ challenge_id: `supabase:${encodeURIComponent(email)}:${purpose}`, expires_at: new Date(Date.now() + 60 * 60_000).toISOString(), delivery: 'email' });
+    // The fallback challenge carries the authenticated user id so verification can
+    // explicitly confirm the newly created signup account before password login.
+    return NextResponse.json({ challenge_id: `supabase:${encodeURIComponent(email)}:${purpose}:${userId}`, expires_at: new Date(Date.now() + 60 * 60_000).toISOString(), delivery: 'email' });
   } catch {
     return NextResponse.json({ error: 'Unable to send the verification code by email.' }, { status: 500 });
   }
