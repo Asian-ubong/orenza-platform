@@ -1,5 +1,6 @@
 import './globals.css';
 import ServiceWorkerRegister from './sw-register';
+import UpdateNotice from './update-notice';
 
 export const metadata = {
   title: 'ORENZA BROKER — Smart Trading. Secure Future.',
@@ -14,5 +15,5 @@ export const metadata = {
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><head><link rel="stylesheet" href="/brand/brand-overrides.css" /></head><body>{children}<ServiceWorkerRegister /></body></html>;
+  return <html lang="en"><head><link rel="stylesheet" href="/brand/brand-overrides.css" /></head><body>{children}<UpdateNotice /><ServiceWorkerRegister /></body></html>;
 }
