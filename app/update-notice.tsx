@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import packageJson from '../package.json';
+import { App } from '@capacitor/app';
 
-const INSTALLED_APP_VERSION = packageJson.version;
+const WEB_FALLBACK_VERSION = '0.1.1';
 
 type UpdateInfo = {
   name?: string;
@@ -23,6 +23,7 @@ function compareVersions(a: string, b: string) {
 }
 
 export default function UpdateNotice() {
+  const [installedVersion, setInstalledVersion] = useState(WEB_FALLBACK_VERSION);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -30,14 +31,23 @@ export default function UpdateNotice() {
     let active = true;
     const check = async () => {
       try {
-        const response = await fetch(`/api/version?client=${encodeURIComponent(INSTALLED_APP_VERSION)}&t=${Date.now()}`, {
+        const info = await App.getInfo();
+        if (active && info.version) setInstalledVersion(info.version);
+      } catch {
+        // The older Orenza shell may not contain the App plugin; keep the safe fallback.
+      }
+
+      try {
+        const response = await fetch(`/api/version?client=${encodeURIComponent(installedVersion)}&t=${Date.now()}`, {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' },
         });
         if (!response.ok) return;
         const data = (await response.json()) as UpdateInfo;
-        if (active && data.version && compareVersions(data.version, INSTALLED_APP_VERSION) > 0) {
+        if (active && data.version && compareVersions(data.version, installedVersion) > 0) {
           setUpdate(data);
+        } else if (active) {
+          setUpdate(null);
         }
       } catch {
         // Update checks must never block the application.
@@ -49,7 +59,7 @@ export default function UpdateNotice() {
       active = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [installedVersion]);
 
   if (!update?.version) return null;
 
