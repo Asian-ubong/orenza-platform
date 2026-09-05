@@ -1,1 +1,34 @@
-.brand span,.logoMark{background-color:#2A402D!important;background-image:url('/brand/orenza-mark.svg')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important;color:transparent!important;text-indent:-9999px!important;overflow:hidden!important}.brandHeroMark,.brandHeroMark.small{background-color:#2A402D!important;background-image:url('/brand/orenza-mark.svg')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:78%!important;color:transparent!important;text-indent:-9999px!important;overflow:hidden!important}
+:root{--orenza-gold:#D4AF37;--orenza-gold-deep:#B8860B;--orenza-white:#FFFFFF;--orenza-black:#0A0A0A;--orenza-panel:#111111;--orenza-panel-2:#171717;--orenza-line:#3b321f;--orenza-muted:#a9a9a9}
+html,body{background:var(--orenza-black)!important;color:var(--orenza-white)!important}
+body{color-scheme:dark}
+.appShell{background:var(--orenza-black)!important}
+.appShell aside{background:#0a0a0a!important;border-right:1px solid var(--orenza-line)!important}
+.appShell main{background:var(--orenza-black)!important}
+.topbar,.mobileBar{background:rgba(10,10,10,.96)!important;border-color:var(--orenza-line)!important;color:var(--orenza-white)!important}
+.platformShell,.content{color:var(--orenza-white)!important}
+.pageHead h1,.marketsHero h1{color:var(--orenza-gold)!important}
+.eyebrow,.label{color:var(--orenza-gold)!important}
+.muted,.sectionHead p,.market strong,.market small,.card small,.setting small,.provider small,.sideSecurity small{color:var(--orenza-muted)!important}
+.card,.section,.quick,.market,.provider,.setting,.marketStats>div,.marketSearch,.tabs span,.formGrid input,.formGrid select,.choice{background:var(--orenza-panel)!important;border-color:var(--orenza-line)!important;color:var(--orenza-white)!important}
+.quick:hover,nav a:hover,nav a.active{background:#211c10!important;color:var(--orenza-gold)!important}
+.btn{background:var(--orenza-gold)!important;color:#080808!important;font-weight:800}
+.btn.secondary{background:#211c10!important;color:var(--orenza-gold)!important;border:1px solid var(--orenza-gold-deep)!important}
+.heroBalance,.premiumHero{background:linear-gradient(135deg,#15110a,#0d0d0d)!important;border:1px solid var(--orenza-line)!important}
+.choice.selected,.tabs span.active{background:var(--orenza-gold)!important;color:#080808!important;border-color:var(--orenza-gold)!important}
+.chartPlaceholder{background:linear-gradient(180deg,#111,#0a0a0a)!important}
+.splash,.gate,.authCanvas{background:#000!important}
+.splashOrb{background:radial-gradient(circle,rgba(212,175,55,.18) 0%,transparent 68%)!important}
+.splashCard,.gateCard,.authCard{background:rgba(10,10,10,.97)!important;border-color:var(--orenza-line)!important;box-shadow:0 25px 90px rgba(0,0,0,.65)!important}
+.splashCard .eyebrow,.gateCard .eyebrow,.authCard .eyebrow{color:var(--orenza-gold)!important}
+.authBrand b{color:var(--orenza-gold)!important}.authBrand span{color:#d6d6d6!important}
+.authForm input{background:#111!important;border-color:#40351e!important;color:#fff!important}
+.authForm input:focus{border-color:var(--orenza-gold)!important;box-shadow:0 0 0 2px rgba(212,175,55,.12)!important}
+.authSubmit{background:var(--orenza-gold)!important;color:#050505!important}
+.authFooter,.authFooter a,.textButton{color:var(--orenza-gold)!important}
+.authNotice,.verifiedHint,.gateNotice{background:#15130d!important;border-color:var(--orenza-line)!important;color:#ddd!important}
+.authError{background:#260e0e!important;border-color:#6b2525!important;color:#ffb5b5!important}
+.brand span,.logoMark{background-color:#0a0a0a!important;background-image:url('/brand/orenza-mark.svg')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important;color:transparent!important;text-indent:-9999px!important;overflow:hidden!important;border:1px solid var(--orenza-gold-deep)!important}
+.brandHeroMark,.brandHeroMark.small{background-color:#0a0a0a!important;background-image:url('/brand/orenza-mark.svg')!important;background-repeat:no-repeat!important;background-position:center!important;background-size:78%!important;color:transparent!important;text-indent:-9999px!important;overflow:hidden!important;border-color:var(--orenza-gold)!important}
+nav a{color:#bcbcbc!important}nav a.active{color:var(--orenza-gold)!important}
+.sideSecurity{background:#111!important;border-color:var(--orenza-line)!important}.sideSecurity b{color:#fff!important}
+.marketPrice{color:#ddd!important}.marketPrice small{color:#999!important}
