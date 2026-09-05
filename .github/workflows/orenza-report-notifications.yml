@@ -1,0 +1,51 @@
+name: Orenza Operational Report Notifications
+
+on:
+  workflow_run:
+    workflows:
+      - Orenza CI
+      - Orenza Vercel Deployment
+      - Orenza Android Release Pipeline
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send workflow result to ORENZA report subscribers
+        env:
+          REPORT_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          STATUS: ${{ github.event.workflow_run.conclusion }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          COMMIT: ${{ github.event.workflow_run.head_sha }}
+          MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
+          REPORT_ENDPOINT: https://orenza-platform.vercel.app/api/reports/dispatch
+          REPORT_SECRET: ${{ secrets.ORENZA_REPORT_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REPORT_SECRET}" ]; then
+            echo "ORENZA_REPORT_WEBHOOK_SECRET is not configured; report delivery is intentionally skipped."
+            exit 0
+          fi
+          ts=$(date +%s%3N)
+          payload=$(jq -cn \
+            --arg source github \
+            --arg status "${STATUS}" \
+            --arg name "${WORKFLOW}" \
+            --arg branch "${BRANCH}" \
+            --arg commit "${COMMIT}" \
+            --arg message "${MESSAGE}" \
+            --arg url "${REPORT_URL}" \
+            --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{source:$source,status:$status,name:$name,branch:$branch,commit:$commit,message:$message,url:$url,time:$time}')
+          signature=$(printf '%s.%s' "${ts}" "${payload}" | openssl dgst -sha256 -hmac "${REPORT_SECRET}" -hex | sed 's/^.* //')
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST "${REPORT_ENDPOINT}" \
+            -H 'content-type: application/json' \
+            -H "x-orenza-report-timestamp: ${ts}" \
+            -H "x-orenza-report-signature: ${signature}" \
+            --data "${payload}"
