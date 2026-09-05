@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import packageJson from '../package.json';
 
-const INSTALLED_APP_VERSION = '0.1.1';
+const INSTALLED_APP_VERSION = packageJson.version;
 
 type UpdateInfo = {
   name?: string;
