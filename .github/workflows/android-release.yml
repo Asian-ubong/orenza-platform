@@ -95,13 +95,20 @@ jobs:
       - name: Validate Android artifacts
         run: |
           set -euxo pipefail
-          test -s android/app/build/outputs/apk/debug/app-debug.apk
-          test -s android/app/build/outputs/apk/release/app-release.apk
-          test -s android/app/build/outputs/bundle/release/app-release.aab
+          DEBUG_APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE_APK=$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name 'app-release*.apk' -print -quit)
+          RELEASE_AAB="android/app/build/outputs/bundle/release/app-release.aab"
+          test -s "$DEBUG_APK"
+          test -n "$RELEASE_APK"
+          test -s "$RELEASE_APK"
+          test -s "$RELEASE_AAB"
+          echo "Debug APK: $DEBUG_APK"
+          echo "Release APK: $RELEASE_APK"
+          echo "Release AAB: $RELEASE_AAB"
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/orenza-debug.apk
-          cp android/app/build/outputs/apk/release/app-release.apk artifacts/orenza-release.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab artifacts/orenza-release.aab
+          cp "$DEBUG_APK" artifacts/orenza-debug.apk
+          cp "$RELEASE_APK" artifacts/orenza-release.apk
+          cp "$RELEASE_AAB" artifacts/orenza-release.aab
           sha256sum artifacts/orenza-debug.apk artifacts/orenza-release.apk artifacts/orenza-release.aab > artifacts/orenza-android.sha256
           zip -j artifacts/orenza-android-package.zip artifacts/orenza-debug.apk artifacts/orenza-release.apk artifacts/orenza-release.aab artifacts/orenza-android.sha256
       - name: Upload source and Android package
