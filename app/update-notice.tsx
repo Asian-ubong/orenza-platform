@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 
-const WEB_FALLBACK_VERSION = '0.1.4';
-const REMINDER_KEY = 'orenza.update.remind-until.v1';
-const DISMISSED_KEY = 'orenza.update.dismissed-session.v1';
+const NATIVE_FALLBACK_VERSION = '0.1.5';
+const REMINDER_KEY = 'orenza.update.remind-until.v2';
+const DISMISSED_KEY = 'orenza.update.dismissed-session.v2';
 const REMINDER_MS = 24 * 60 * 60 * 1000;
 
 export type UpdateInfo = {
@@ -47,56 +48,57 @@ function isDismissedForSession() {
 }
 
 export default function UpdateNotice() {
-  const [installedVersion, setInstalledVersion] = useState(WEB_FALLBACK_VERSION);
+  const [installedVersion, setInstalledVersion] = useState(NATIVE_FALLBACK_VERSION);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-
-  const checkForUpdate = async () => {
-    let currentVersion = WEB_FALLBACK_VERSION;
-
-    try {
-      const info = await App.getInfo();
-      if (info.version) currentVersion = info.version;
-    } catch {
-      // Web builds do not expose native app metadata; use the web fallback.
-    }
-
-    setInstalledVersion(currentVersion);
-
-    try {
-      const response = await fetch(`/api/version?platform=android&client=${encodeURIComponent(currentVersion)}&t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' },
-      });
-      if (!response.ok) return;
-
-      const data = (await response.json()) as UpdateInfo;
-      if (!data.version) return;
-
-      const newer = compareVersions(data.version, currentVersion) > 0;
-      const belowMinimum = Boolean(data.minimumVersion) && compareVersions(currentVersion, data.minimumVersion || '0.0.0') < 0;
-      const shouldShow = newer || belowMinimum;
-
-      if (shouldShow) setUpdate(data);
-      else setUpdate(null);
-    } catch {
-      // Update checks must never block or break the ORENZA application.
-    }
-  };
+  const [nativeAndroid, setNativeAndroid] = useState(false);
 
   useEffect(() => {
+    setNativeAndroid(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
+  }, []);
+
+  useEffect(() => {
+    if (!nativeAndroid) return;
+
     let active = true;
-    const run = async () => {
+    const checkForUpdate = async () => {
+      let currentVersion = NATIVE_FALLBACK_VERSION;
+
+      try {
+        const info = await App.getInfo();
+        if (info.version) currentVersion = info.version;
+      } catch {
+        // Keep the safe fallback if native metadata is unavailable.
+      }
+
       if (!active) return;
-      setDismissed(isDismissedForSession());
-      await checkForUpdate();
+      setInstalledVersion(currentVersion);
+
+      try {
+        const response = await fetch(`/api/version?platform=android&client=${encodeURIComponent(currentVersion)}&t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (!response.ok) return;
+
+        const data = (await response.json()) as UpdateInfo;
+        if (!active || !data.version) return;
+
+        const newer = compareVersions(data.version, currentVersion) > 0;
+        const belowMinimum = Boolean(data.minimumVersion) && compareVersions(currentVersion, data.minimumVersion || '0.0.0') < 0;
+        setUpdate(newer || belowMinimum ? data : null);
+      } catch {
+        // Update checks never block or break the ORENZA application.
+      }
     };
 
-    run();
-    const timer = window.setInterval(run, 5 * 60 * 1000);
+    setDismissed(isDismissedForSession());
+    void checkForUpdate();
+
+    const timer = window.setInterval(checkForUpdate, 5 * 60 * 1000);
     const onVisible = () => {
-      if (document.visibilityState === 'visible') run();
+      if (document.visibilityState === 'visible') void checkForUpdate();
     };
     document.addEventListener('visibilitychange', onVisible);
 
@@ -105,12 +107,12 @@ export default function UpdateNotice() {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [nativeAndroid]);
 
   const forced = Boolean(update?.forceUpdate) || Boolean(update?.minimumVersion && compareVersions(installedVersion, update.minimumVersion) < 0);
   const reminderActive = useMemo(() => readNumber(REMINDER_KEY) > Date.now(), [update]);
 
-  if (!update?.version || (!forced && (dismissed || reminderActive))) return null;
+  if (!nativeAndroid || !update?.version || (!forced && (dismissed || reminderActive))) return null;
 
   const openPlayStore = async () => {
     const url = update.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.orenzatech.orenza';
@@ -137,7 +139,7 @@ export default function UpdateNotice() {
     try {
       window.sessionStorage.setItem(DISMISSED_KEY, '1');
     } catch {
-      // Session storage is only a convenience; dismissal still applies to this render.
+      // Session storage is only a convenience.
     }
     setDismissed(true);
   };
