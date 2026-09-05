@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
-import Link from 'next/navigation';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
@@ -35,6 +35,7 @@ export default function RegisterPage() {
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
       sessionStorage.setItem('orenza_pending_phone', phone.trim());
       sessionStorage.setItem('orenza_auth_flow', 'signup');
+      sessionStorage.setItem('orenza_pending_user_id', String(result.user_id || ''));
       localStorage.setItem('orenza_pending_email', normalizedEmail);
       localStorage.setItem('orenza_auth_flow', 'signup');
       localStorage.setItem('orenza_pending_user_id', String(result.user_id || ''));
