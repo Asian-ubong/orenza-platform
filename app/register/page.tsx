@@ -44,13 +44,23 @@ export default function RegisterPage() {
       if (result.authenticated) {
         const { error: loginError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
         if (loginError) throw loginError;
+        
+        // FEATURE FLAG: OTP verification is temporarily disabled
+        // TODO: Re-enable OTP verification before production release
+        // router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
+        
+        // For now, route directly to promo code scanner for new users
         router.replace('/promotion');
         return;
       }
 
-      // If the Supabase project requires email confirmation, move to the
-      // existing verification screen rather than reporting a false success.
-      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
+      // FEATURE FLAG: OTP verification is temporarily disabled
+      // If Supabase project requires email confirmation, it will be handled server-side
+      // TODO: Re-enable the verify screen below before production
+      // router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
+      
+      // For now, route directly to promo code scanner for new users
+      router.replace('/promotion');
     } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be completed.'); }
     finally { setBusy(false); }
   }
@@ -69,6 +79,6 @@ export default function RegisterPage() {
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">Already registered? <Link href="/login">Log in</Link></div>
-    <div className="splashTrust"><ShieldCheck size={16}/><span>After registration, you go directly to promotion access. KYC remains a live-trading gate.</span></div>
+    <div className="splashTrust"><ShieldCheck size={16}/><span>After registration, you go directly to promotion access. Email verification is deferred until production enablement.</span></div>
   </section></main>;
 }
