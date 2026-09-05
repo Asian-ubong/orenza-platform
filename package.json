@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
-    "typescript": "latest",
+    "typescript": "5.8.3",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest"
