@@ -4,7 +4,6 @@ import { FormEvent, useState } from 'react';
 import { ArrowRight, LockKeyhole, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getSupabaseBrowser } from '../../lib/supabase-browser';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -40,27 +39,7 @@ export default function RegisterPage() {
       localStorage.setItem('orenza_auth_flow', 'signup');
       localStorage.setItem('orenza_pending_user_id', String(result.user_id || ''));
 
-      const supabase = getSupabaseBrowser();
-      if (result.authenticated) {
-        const { error: loginError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-        if (loginError) throw loginError;
-        
-        // FEATURE FLAG: OTP verification is temporarily disabled
-        // TODO: Re-enable OTP verification before production release
-        // router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
-        
-        // For now, route directly to promo code scanner for new users
-        router.replace('/promotion');
-        return;
-      }
-
-      // FEATURE FLAG: OTP verification is temporarily disabled
-      // If Supabase project requires email confirmation, it will be handled server-side
-      // TODO: Re-enable the verify screen below before production
-      // router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
-      
-      // For now, route directly to promo code scanner for new users
-      router.replace('/promotion');
+      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be completed.'); }
     finally { setBusy(false); }
   }
@@ -68,8 +47,8 @@ export default function RegisterPage() {
   return <main className="authCanvas"><section className="authCard">
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
-    <p className="authSub">Enter your name, email, phone number and password. Registration takes you directly to the approved promotion QR scanner.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is used only for authentication and is never saved in browser storage.</span></div>
+    <p className="authSub">Create your account, then continue to secure one-time verification.</p>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Email delivery remains controlled by the configured verification provider. If delivery is disabled, ORENZA will show a clear unavailable state rather than claiming a code was sent.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
@@ -79,6 +58,6 @@ export default function RegisterPage() {
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">Already registered? <Link href="/login">Log in</Link></div>
-    <div className="splashTrust"><ShieldCheck size={16}/><span>After registration, you go directly to promotion access. Email verification is deferred until production enablement.</span></div>
+    <div className="splashTrust"><ShieldCheck size={16}/><span>Registration is followed by one-time verification before entering the authenticated ORENZA application.</span></div>
   </section></main>;
 }
