@@ -3,9 +3,9 @@ import ServiceWorkerRegister from './sw-register';
 import UpdateNotice from './update-notice';
 
 export const metadata = {
-  title: 'ORENZA BROKER — Smart Trading. Secure Future.',
-  description: 'ORENZA BROKER private trading, market analysis, sandbox and connected provider workspace.',
-  applicationName: 'ORENZA BROKER',
+  title: 'ORENZA — Smart Trading. Secure Future.',
+  description: 'ORENZA trading, market analysis, sandbox and connected provider workspace.',
+  applicationName: 'ORENZA',
   manifest: '/manifest.json',
   icons: {
     icon: '/brand/orenza-mark.svg',
