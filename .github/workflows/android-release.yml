@@ -12,7 +12,7 @@ on:
         type: boolean
 
 permissions:
-  contents: read
+  contents: write
   actions: write
 
 jobs:
@@ -91,6 +91,14 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Set Android app version for upgrade
+        run: |
+          VERSION_NAME=$(node -p "require('./package.json').version")
+          VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))
+          sed -i -E "s/versionCode [0-9]+/versionCode ${VERSION_CODE}/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]+\"/versionName \"${VERSION_NAME}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
+
       - name: Build debug APK
         working-directory: android
         run: |
@@ -136,25 +144,52 @@ jobs:
             adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
             adb shell am force-stop com.orenzatech.orenza
 
-  finalize:
+  release:
     needs: [build-test-backup, emulator-test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+
+      - name: Set up Node
+        uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+        with:
+          node-version: 22
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
+        with:
+          name: orenza-android-${{ github.sha }}
+          path: artifacts
+
+      - name: Publish Android release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release create "v${VERSION}" artifacts/orenza-debug.apk --title "ORENZA Android ${VERSION}" --generate-notes
+
+  finalize:
+    needs: [build-test-backup, emulator-test, release]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Pipeline result
         run: |
-          if [ "${{ needs.build-test-backup.result }}" = "success" ] && [ "${{ needs.emulator-test.result }}" = "success" ]; then
-            echo "ORENZA END-TO-END PASS: code -> APK -> tests -> backup -> emulator install/launch -> verify"
+          if [ "${{ needs.build-test-backup.result }}" = "success" ] && [ "${{ needs.emulator-test.result }}" = "success" ] && [ "${{ needs.release.result }}" = "success" ]; then
+            echo "ORENZA END-TO-END PASS: code -> APK -> tests -> emulator install/launch -> release asset"
           else
-            echo "ORENZA END-TO-END FAIL: do not perform cleanup or release"
+            echo "ORENZA END-TO-END FAIL: do not claim release/update readiness"
             exit 1
           fi
 
       - name: Notification
         run: |
           echo "ORENZA Android pipeline completed: PASS"
-          echo "APK, ZIP package, checksum, and source backup are stored as workflow artifacts."
-          echo "Phone installation remains a physical-device step; no claim is made that the user's phone was installed automatically."
+          echo "APK is published as the latest GitHub release asset."
+          echo "Phone installation/update remains subject to Android's user-confirmed install security."
 
       - name: Approved cleanup gate
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.approved_cleanup == true }}
