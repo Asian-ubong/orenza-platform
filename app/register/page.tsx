@@ -24,9 +24,6 @@ export default function RegisterPage() {
     try {
       setBusy(true);
       const normalizedEmail = email.trim().toLowerCase();
-
-      // Registration is now the complete authentication step for the test
-      // environment. No email OTP is requested or sent here.
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,10 +31,6 @@ export default function RegisterPage() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Registration could not be completed.');
-
-      const supabase = getSupabaseBrowser();
-      const { error: loginError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-      if (loginError) throw loginError;
 
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_pending_name', fullName.trim());
@@ -47,8 +40,17 @@ export default function RegisterPage() {
       localStorage.setItem('orenza_auth_flow', 'signup');
       localStorage.setItem('orenza_pending_user_id', String(result.user_id || ''));
 
-      // Required test sequence: Register → Promotion QR scanner.
-      router.replace('/promotion');
+      const supabase = getSupabaseBrowser();
+      if (result.authenticated) {
+        const { error: loginError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+        if (loginError) throw loginError;
+        router.replace('/promotion');
+        return;
+      }
+
+      // If the Supabase project requires email confirmation, move to the
+      // existing verification screen rather than reporting a false success.
+      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=signup`);
     } catch (e) { setError(e instanceof Error ? e.message : 'Registration could not be completed.'); }
     finally { setBusy(false); }
   }
@@ -57,7 +59,7 @@ export default function RegisterPage() {
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
     <p className="authSub">Enter your name, email, phone number and password. Registration takes you directly to the approved promotion QR scanner.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Email OTP verification is disabled for this test flow. Your password is never saved in browser storage.</span></div>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Your password is used only for authentication and is never saved in browser storage.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
