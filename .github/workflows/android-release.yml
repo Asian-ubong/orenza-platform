@@ -167,15 +167,50 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           gh release create "v${VERSION}" artifacts/orenza-release.apk artifacts/orenza-release.aab artifacts/orenza-android.sha256 --title "ORENZA Android ${VERSION}" --generate-notes
 
-  finalize:
+  google-play:
     needs: [build-test-backup, emulator-test, release]
+    if: ${{ always() && needs.build-test-backup.result == 'success' && needs.emulator-test.result == 'success' && needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.ORENZA_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+      - name: Set up Node
+        uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+        with:
+          node-version: 22
+      - name: Download Android package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
+        with:
+          name: orenza-android-${{ github.sha }}
+          path: artifacts
+      - name: Google Play publish status
+        if: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON == '' }}
+        run: echo "::notice::Google Play upload is prepared but skipped because ORENZA_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not configured."
+      - name: Upload AAB to Google Play internal testing
+        if: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.orenzatech.orenza
+          releaseFiles: artifacts/orenza-release.aab
+          tracks: internal
+          status: completed
+          releaseName: ORENZA Android ${{ github.sha }}
+          inAppUpdatePriority: 3
+
+  finalize:
+    needs: [build-test-backup, emulator-test, release, google-play]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Pipeline result
         run: |
-          if [ "${{ needs.build-test-backup.result }}" = "success" ] && [ "${{ needs.emulator-test.result }}" = "success" ] && { [ "${{ needs.release.result }}" = "success" ] || [ "${{ needs.release.result }}" = "skipped" ]; }; then
-            echo "ORENZA END-TO-END PASS: web -> smoke tests -> Android debug/release APK -> AAB -> emulator"
+          if [ "${{ needs.build-test-backup.result }}" = "success" ] && [ "${{ needs.emulator-test.result }}" = "success" ] && { [ "${{ needs.release.result }}" = "success" ] || [ "${{ needs.release.result }}" = "skipped" ]; } && { [ "${{ needs.google-play.result }}" = "success" ] || [ "${{ needs.google-play.result }}" = "skipped" ]; }; then
+            echo "ORENZA END-TO-END PASS: web -> smoke tests -> Android debug/release APK -> AAB -> emulator -> release/Play gate"
           else
             echo "ORENZA END-TO-END FAIL: do not claim release/update readiness"
             exit 1
@@ -183,7 +218,7 @@ jobs:
       - name: Notification
         run: |
           echo "ORENZA Android pipeline completed: PASS"
-          echo "Release publication remains explicit; normal pushes do not publish a GitHub release."
+          echo "Google Play publication is conditional on the configured ORENZA_GOOGLE_PLAY_SERVICE_ACCOUNT_JSON secret."
       - name: Approved cleanup gate
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.approved_cleanup == true }}
         run: echo "Approved cleanup requested; no source/destructive cleanup is performed by this pipeline."
