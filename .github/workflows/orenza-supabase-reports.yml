@@ -1,0 +1,37 @@
+name: Orenza Supabase Health Reports
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Supabase and email the result
+        env:
+          REPORT_ENDPOINT: https://orenza-platform.vercel.app/api/reports/supabase-health
+          REPORT_SECRET: ${{ secrets.ORENZA_REPORT_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${REPORT_SECRET}" ]; then
+            echo "ORENZA_REPORT_WEBHOOK_SECRET is not configured; Supabase reporting is intentionally skipped."
+            exit 0
+          fi
+          ts=$(date +%s%3N)
+          payload=$(jq -cn --arg source supabase --arg time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{source:$source,time:$time}')
+          signature=$(printf '%s.%s' "${ts}" "${payload}" | openssl dgst -sha256 -hmac "${REPORT_SECRET}" -hex | sed 's/^.* //')
+          response=$(curl --silent --show-error --max-time 30 -w '\n%{http_code}' \
+            -X POST "${REPORT_ENDPOINT}" \
+            -H 'content-type: application/json' \
+            -H "x-orenza-report-timestamp: ${ts}" \
+            -H "x-orenza-report-signature: ${signature}" \
+            --data "${payload}")
+          body=$(printf '%s' "${response}" | sed '$d')
+          code=$(printf '%s' "${response}" | tail -n1)
+          echo "Supabase health response (${code}): ${body}"
+          test "${code}" = "200"
