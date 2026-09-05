@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'ORENZA BROKER',
+    name: 'ORENZA',
     short_name: 'ORENZA',
     description: 'Smart Trading. Secure Future.',
     start_url: '/',
