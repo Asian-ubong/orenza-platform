@@ -7,7 +7,7 @@ export default function Splash() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = window.setTimeout(() => router.replace('/register'), 3000);
+    const timer = window.setTimeout(() => router.replace('/login'), 3000);
     return () => window.clearTimeout(timer);
   }, [router]);
 
@@ -19,12 +19,12 @@ export default function Splash() {
         <p className="eyebrow">WELCOME TO ORENZA</p>
         <h1>Funding the Future of Trading.</h1>
         <p className="splashSub">Secure access for ambitious future traders.</p>
-        <div aria-label="Opening registration" role="progressbar" style={{marginTop:20,height:4,borderRadius:999,overflow:'hidden',background:'rgba(255,255,255,.12)'}}>
+        <div aria-label="Opening login" role="progressbar" style={{marginTop:20,height:4,borderRadius:999,overflow:'hidden',background:'rgba(255,255,255,.12)'}}>
           <span style={{display:'block',height:'100%',width:'100%',transformOrigin:'left',background:'#C9A063',animation:'orenzaSplashProgress 3s linear forwards'}} />
         </div>
-        <p style={{marginTop:10,fontSize:11,opacity:.62}}>Opening secure registration…</p>
+        <p style={{marginTop:10,fontSize:11,opacity:.62}}>Opening secure login…</p>
         <style>{`@keyframes orenzaSplashProgress{from{transform:scaleX(0)}to{transform:scaleX(1)}}`}</style>
-        <p style={{ marginTop: 16, fontSize: 11, opacity: .62 }}>Authentication • Tester authorization • KYC • Withdrawal authorization are separate controls.</p>
+        <p style={{ marginTop: 16, fontSize: 11, opacity: .62 }}>New users can create an account from the login screen.</p>
       </div>
     </main>
   );
