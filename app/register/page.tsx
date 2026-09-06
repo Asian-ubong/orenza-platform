@@ -6,6 +6,24 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowser } from '../../lib/supabase-browser';
 
+const PRODUCTION_API_ORIGIN = 'https://orenza-platform.vercel.app';
+
+type CapacitorWindow = Window & {
+  Capacitor?: {
+    isNativePlatform?: () => boolean;
+  };
+};
+
+function getRegistrationApiUrl(path: string) {
+  if (typeof window === 'undefined') return path;
+  const native = (window as CapacitorWindow).Capacitor?.isNativePlatform?.() === true;
+  if (native || window.location.protocol === 'capacitor:' || window.location.protocol === 'ionic:') {
+    const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, '');
+    return `${configuredOrigin || PRODUCTION_API_ORIGIN}${path}`;
+  }
+  return path;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
@@ -26,7 +44,7 @@ export default function RegisterPage() {
     try {
       setBusy(true);
       const normalizedEmail = email.trim().toLowerCase();
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(getRegistrationApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -37,7 +55,7 @@ export default function RegisterPage() {
         }),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Registration could not be completed.');
+      if (!response.ok) throw new Error(result.error || `Registration failed (${response.status}).`);
 
       // The signup path intentionally skips email OTP. Establish the Supabase
       // session immediately, then take the new account to the promo scanner.
@@ -62,7 +80,10 @@ export default function RegisterPage() {
 
       router.replace('/promotion');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Registration could not be completed.');
+      const message = e instanceof TypeError && e.message === 'Failed to fetch'
+        ? 'ORENZA could not reach the account service. Check your internet connection and try again.'
+        : e instanceof Error ? e.message : 'Registration could not be completed.';
+      setError(message);
     } finally {
       setBusy(false);
     }
