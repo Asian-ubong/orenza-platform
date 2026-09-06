@@ -38,6 +38,13 @@ const payoutBlocked = payoutApi.status === 401;
 console.log(`${payoutBlocked ? 'PASS' : 'FAIL'} unauthenticated profit payout is blocked: ${payoutApi.status}`);
 if (!payoutBlocked) failures += 1;
 
+for (const path of ['/api/payout/withdraw', '/api/sandbox/e2e']) {
+  const response = await fetch(`${base}${path}`, { method: 'GET', redirect: 'manual' });
+  const methodProtected = response.status === 405;
+  console.log(`${methodProtected ? 'PASS' : 'FAIL'} protected POST-only API rejects GET ${path}: ${response.status}`);
+  if (!methodProtected) failures += 1;
+}
+
 const version = await fetch(`${base}/api/version`, { redirect: 'manual' });
 const cacheControl = version.headers.get('cache-control') || '';
 const noStore = cacheControl.toLowerCase().includes('no-store');
