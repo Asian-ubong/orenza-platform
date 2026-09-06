@@ -1,0 +1,37 @@
+:root{color-scheme:light dark;--or-bg:#FAF9F6;--or-surface:#fffdf8;--or-surface-2:#f1eee5;--or-border:#e1d9c9;--or-border-strong:#dcd4c4;--or-text:#0B192B;--or-muted:#756f63;--or-muted-2:#817a6e;--or-green:#2A402D;--or-green-text:#FAF9F6;--or-gold:#C9A063}
+@media (prefers-color-scheme:dark){
+  html,body{background:#0d1511!important;color:#f4f6f2!important;color-scheme:dark}
+  body,main,.marketsPage{background:#0d1511!important;color:#f4f6f2!important}
+  aside,.topbar,.mobileBar{background:#111b16!important;border-color:#2b382f!important}
+  .card,.section,.quick,.provider,.market,.setting,.tabs span,.marketStats>div,.marketSearch,.formGrid input,.formGrid select,.choice{background:#17221c!important;border-color:#344238!important;color:#f4f6f2!important}
+  .notice{background:#19241e!important;border-color:#344238!important}
+  .warning{background:#292619!important;border-color:#5b4d2f!important}
+  .muted,.sectionHead p,.market small,.marketPrice,.marketPrice small,.eyebrow,.label,.privateTag,.provider small,.card small,.setting small,.empty,.analysisRows span,.reviewList span,.marketStats span,.marketStats small,.marketsHero p:not(.eyebrow),.authSub,.authFooter,.splashTrust{color:#b8c1ba!important}
+  nav a{color:#b8c1ba!important}
+  nav a.active,nav a:hover{background:#26372c!important;color:#f4f6f2!important}
+  .sideSecurity,.reviewBox{background:#1c2821!important;border-color:#344238!important}
+  .sideSecurity small,.notice span,.warning span{color:#b8c1ba!important}
+  .formGrid label{color:#d7ddd8!important}
+  .formGrid input,.formGrid select,.marketSearch input{color:#f4f6f2!important}
+  .formGrid input::placeholder,.marketSearch input::placeholder{color:#87938b!important}
+  .quick svg:last-child{color:#aeb9b0!important}
+  .badge{border-color:#405047!important}
+  .badge.good{background:#19301f!important;border-color:#315d3b!important;color:#91d39d!important}
+  .badge.warn{background:#332b18!important;color:#e5c77c!important}
+  .badge.danger{background:#351d1b!important;color:#f0aaa4!important}
+  .chartPlaceholder{background:linear-gradient(180deg,#17221c,#111b16)!important}
+  .liveState{background:#17221c!important;border-color:#344238!important;color:#f4f6f2!important}
+  .marketsHero h1,.marketStats strong{color:#d7e2d8!important}
+  .btn{background:#2A402D!important;color:#FAF9F6!important}
+  .btn.secondary{background:#26372c!important;color:#dce6df!important}
+  .choice.selected,.tabs span.active{background:#2A402D!important;color:#FAF9F6!important}
+  .splash,.gate,.authCanvas{background:#08100c!important}
+  .splashCard,.gateCard,.authCard{background:rgba(13,21,17,.97)!important;border-color:#3f5245!important;color:#f4f6f2!important}
+  .gateNotice,.providerChoice{background:#17251d!important;border-color:#3a4a40!important;color:#f4f6f2!important}
+  .providerChoice strong{color:#f4f6f2!important}.providerChoice small{color:#aeb9b0!important}
+  .authForm label{color:#d7ddd8!important}
+  .authForm input{background:#17221c!important;border-color:#3a4a40!important;color:#f4f6f2!important}
+  .authForm input::placeholder{color:#87938b!important}
+  .authError{background:#351d1b!important;border-color:#70413b!important;color:#f0aaa4!important}
+}
+@media (prefers-color-scheme:light){html,body{background:#FAF9F6;color:#0B192B}}
