@@ -79,6 +79,8 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+          sed -i -E 's/minSdkVersion = [0-9]+/minSdkVersion = 26/' android/variables.gradle
+          grep -n "minSdkVersion" android/variables.gradle
       - name: Set Android app version for upgrade
         run: |
           VERSION_NAME=$(node -p "require('./package.json').version")
@@ -183,7 +185,7 @@ jobs:
         with:
           node-version: 22
       - name: Download Android package
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
+        uses: actions/download-artifact@3e5f45a312cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
         with:
           name: orenza-android-${{ github.sha }}
           path: artifacts
