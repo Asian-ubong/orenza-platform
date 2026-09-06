@@ -1,36 +1,16 @@
 import 'server-only';
 
 /**
- * ORENZA's provider-neutral mail transport.
+ * ORENZA email transport backed by SMTP2GO.
  *
- * The application intentionally does not depend on Resend or another
- * transactional-email SaaS. Delivery is delegated to the SMTP server
- * configured for ORENZA (self-hosted or otherwise controlled by ORENZA).
+ * All application email (OTP, KYC verification and operational reports)
+ * goes through this single server-side boundary. No Resend API or SDK is used.
  *
  * Required environment variables:
- * SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL
+ * SMTP2GO_API_KEY, SMTP2GO_FROM_EMAIL
  */
 
-import nodemailer from 'nodemailer';
-
-function getTransport() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const password = process.env.SMTP_PASSWORD;
-
-  if (!host || !user || !password || !Number.isFinite(port)) return null;
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass: password },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 10000,
-  });
-}
+const SMTP2GO_API_URL = 'https://api.smtp2go.com/v3/email/send';
 
 export async function sendOrenzaEmail(input: {
   to: string;
@@ -38,34 +18,46 @@ export async function sendOrenzaEmail(input: {
   text: string;
   html?: string;
 }) {
-  const from = process.env.SMTP_FROM_EMAIL;
-  const transport = getTransport();
+  const apiKey = process.env.SMTP2GO_API_KEY;
+  const from = process.env.SMTP2GO_FROM_EMAIL;
 
-  if (!transport || !from) {
+  if (!apiKey || !from) {
     return { ok: false, configured: false } as const;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
   try {
-    await transport.sendMail({
-      from,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      ...(input.html ? { html: input.html } : {}),
+    const response = await fetch(SMTP2GO_API_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Smtp2go-Api-Key': apiKey,
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: from,
+        to: [input.to],
+        subject: input.subject,
+        text_body: input.text,
+        ...(input.html ? { html_body: input.html } : {}),
+      }),
     });
-    return { ok: true, configured: true } as const;
+
+    if (!response.ok) return { ok: false, configured: true } as const;
+
+    const result = await response.json().catch(() => null) as { data?: { succeeded?: number; failed?: number } } | null;
+    const succeeded = Number(result?.data?.succeeded ?? 0);
+    return { ok: succeeded > 0, configured: true } as const;
   } catch {
     return { ok: false, configured: true } as const;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
 export async function verifyOrenzaMailTransport() {
-  const transport = getTransport();
-  if (!transport || !process.env.SMTP_FROM_EMAIL) return false;
-  try {
-    await transport.verify();
-    return true;
-  } catch {
-    return false;
-  }
+  return Boolean(process.env.SMTP2GO_API_KEY && process.env.SMTP2GO_FROM_EMAIL);
 }
