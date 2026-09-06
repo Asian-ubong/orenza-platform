@@ -72,7 +72,14 @@ begin
     return;
   end if;
 
-  select expires_at into v_expires from public.orenza_tester_access where user_id = p_user_id and active = true;
+  -- Qualify the table column because the function also exposes an output
+  -- column named expires_at. Without qualification PostgreSQL can report
+  -- "column reference expires_at is ambiguous".
+  select ta.expires_at
+    into v_expires
+    from public.orenza_tester_access as ta
+   where ta.user_id = p_user_id
+     and ta.active = true;
   if v_expires is not null and v_expires > now() then
     return query select true, v_expires, 'TESTER_ACCESS_ALREADY_ACTIVE';
     return;
