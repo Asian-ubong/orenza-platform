@@ -1,8 +1,8 @@
 # ORENZA Platform Architecture
 
-## Current audited baseline — 2026-09-05
+## Current audited baseline — 2026-09-06
 
-This document records the implementation actually present in `main` before the master product specification is applied. The repository remains the source of truth; missing integrations are not represented as complete.
+This document records the implementation actually present in `main`. The repository remains the source of truth; missing integrations are not represented as complete.
 
 ## Runtime architecture
 
@@ -36,7 +36,11 @@ The repository contains Paystack test integration routes, payout routes, provide
 
 ### Email / OTP
 
-The repository contains email OTP send/verify API routes and an `auth_email_otp_challenges` database flow. Email delivery is provider-backed through Resend when configured, with a Supabase Auth fallback. The current login UI explicitly keeps email OTP disabled for its test flow; therefore the full login→OTP UX is not yet the canonical active login journey.
+The repository contains email OTP send/verify API routes, KYC verification-code delivery, operational report delivery, and an `auth_email_otp_challenges` database flow. Active ORENZA email delivery now uses the provider-neutral `lib/reports/mailer.ts` transport configured for SMTP2GO SMTP. Supabase Auth email OTP remains a fallback when the ORENZA SMTP transport is unavailable. SMTP2GO credentials are server-only and are not committed.
+
+### Operational reporting
+
+`/reports/subscribe`, `/api/reports/subscribe`, `/api/reports/confirm`, `/api/reports/dispatch`, and `/api/reports/supabase-health` implement the operational report flow. GitHub Actions signs report payloads with HMAC, and only enabled, verified subscribers receive reports. Actual delivery depends on verified SMTP2GO sender configuration and server environment variables.
 
 ## AI architecture
 
@@ -44,33 +48,31 @@ The repository contains `lib/ai-premium/signal-engine.ts` and AI Premium product
 
 ## Security posture
 
-The repository has a server-only environment configuration template, private tester-access logic, security migrations, payout controls, and explicit hard-disable migrations for real-money/live trading. Secrets are not intended to be committed. High-impact actions remain approval-gated.
+The repository has a server-only environment configuration template, private tester-access logic, security migrations, payout controls, and explicit hard-disable migrations for real-money/live trading. Secrets are not intended to be committed. High-impact actions remain approval-gated. SMTP credentials are server-only.
 
 ## Branding and assets
 
-ORENZA brand assets already exist under `public/brand/`, including `or​​enza-mark.svg`, `or​​enza-wordmark.svg`, and brand override CSS. PWA icons and manifest assets also exist. The ORENZA identity must be preserved.
+ORENZA brand assets already exist under `public/brand/`, including `orenza-mark.svg`, `orenza-wordmark.svg`, and brand override CSS. PWA icons and manifest assets also exist. The ORENZA identity must be preserved.
 
 ## Android / iOS
 
 - **Android:** Capacitor application ID is `com.orenzatech.orenza`; app name is `ORENZA`. CI successfully generated, synced, built, installed, and launched an Android 35 debug APK on the latest observed pipeline run.
-- **Android release:** Existing workflow publishes only when explicitly requested, but its published artifact is currently a debug APK. Production signing/AAB release infrastructure is not yet configured.
+- **Android release:** Existing workflow publishes only when explicitly requested. Production signing/AAB release infrastructure still requires signing credentials.
 - **iOS:** No committed iOS project was found in the audited repository tree. iOS therefore cannot be claimed as built/validated from source control.
 
 ## CI/CD baseline
 
-`.github/workflows/orenza-ci.yml` currently installs dependencies, builds the web app, starts production Next.js, and runs the smoke suite. `.github/workflows/orenza-vercel.yml` verifies the deployed production URL and critical routes. `.github/workflows/android-release.yml` performs web build/smoke tests, Android generation, debug APK build, emulator install/launch, artifact upload, and explicit release publication.
-
-The latest observed Android pipeline run completed successfully for build, smoke tests, APK generation, emulator install/launch, and finalization; the release job was skipped because the run was not an explicit Android release invocation.
+`.github/workflows/orenza-ci.yml` currently installs dependencies, builds the web app, starts production Next.js, and runs the smoke suite. `.github/workflows/orenza-vercel.yml` verifies the deployed production URL and critical routes. `.github/workflows/android-release.yml` performs web build/smoke tests, Android generation, debug/release artifact builds, emulator validation, and explicit release publication.
 
 ## Known gaps against the master product specification
 
 1. The active login UX does not yet route through the dedicated OTP screen.
-2. The repository's package scripts do not currently expose separate lint/typecheck/unit/integration test commands.
-3. The Android workflow does not yet validate a release AAB/APK build or production signing.
+2. The repository's package scripts do not currently expose separate lint/unit/integration test commands.
+3. Production Android signing and Google Play credentials still require secure external configuration.
 4. No committed iOS native project is present.
 5. The AI surface is advisory and the repository does not currently include an Agents SDK dependency; this is a deliberate gap pending an architecture decision, not a missing requirement to add agents everywhere.
 6. Several consumer/admin areas are implemented through the shared platform shell and need feature-by-feature verification against the full master checklist rather than being assumed complete from route existence alone.
-7. External credentials/services (email delivery, provider trading, MT5 bridge, payout providers, production AI configuration, and deployment secrets) must be configured outside Git before their respective integrations can be declared operational.
+7. External credentials/services (SMTP2GO sender verification and credentials, provider trading, MT5 bridge, payout providers, production AI configuration, and deployment secrets) must be configured outside Git before their respective integrations can be declared operational.
 
 ## Implementation rule
 
