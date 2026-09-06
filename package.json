@@ -19,10 +19,11 @@
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
     "@zxing/browser": "latest",
+    "lucide-react": "latest",
     "next": "latest",
+    "nodemailer": "^9.1.1",
     "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest"
+    "react-dom": "latest"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
