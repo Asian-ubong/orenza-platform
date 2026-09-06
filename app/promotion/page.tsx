@@ -45,9 +45,19 @@ export default function PromotionPage() {
         throw new Error(body.message || body.error || 'This promotion code is not approved for the test program.');
       }
 
+      const status = await fetch('/api/tester-access/status', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      });
+      if (!status.ok) {
+        const statusBody = await status.json().catch(() => ({}));
+        throw new Error(statusBody.message || statusBody.error || 'Promotion was received, but tester access could not be verified. Please try Continue again.');
+      }
+
       sessionStorage.setItem('orenza_tester_access', 'active');
       setMessage(`Tester access approved until ${new Date(body.expires_at).toLocaleDateString()}. Opening your ORENZA workspace…`);
-      window.setTimeout(() => router.replace('/home'), 500);
+      window.setTimeout(() => router.replace('/home'), 250);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Promotion activation failed.');
     } finally {
@@ -56,8 +66,32 @@ export default function PromotionPage() {
   }
 
   return (
-    <main className="authCanvas">
-      <section className="authCard otpCard" style={{ maxWidth: 680 }}>
+    <main className="authCanvas promoCanvas">
+      <section className="authCard otpCard promoCard" style={{ maxWidth: 680 }}>
+        <style>{`
+          .promoCanvas { background: var(--or-bg) !important; color: var(--or-text) !important; }
+          .promoCard { background: var(--or-surface) !important; color: var(--or-text) !important; border-color: var(--or-border) !important; }
+          .promoCard h1 { color: var(--or-text) !important; }
+          .promoCard .authSub { color: var(--or-muted) !important; }
+          .promoCard label { color: var(--or-text) !important; }
+          .promoInput { width:100%; background:var(--or-surface-2) !important; color:var(--or-text) !important; border:1px solid var(--or-border-strong) !important; border-radius:10px; padding:13px 14px; outline:none; font-weight:700; }
+          .promoInput::placeholder { color:var(--or-muted-2) !important; opacity:1; }
+          .promoInput:focus { border-color:var(--or-gold) !important; box-shadow:0 0 0 3px rgba(201,160,99,.18); }
+          .promoCode { color:#4f8b62 !important; font-size:14px; font-weight:900; letter-spacing:.08em; user-select:text; overflow-wrap:anywhere; }
+          .promoCodeLabel { color:var(--or-muted) !important; }
+          .promoContinue { background:#315f3d !important; color:#fff !important; }
+          .promoContinue:hover { background:#3b7049 !important; }
+          @media (prefers-color-scheme:dark) {
+            .promoCanvas { background:#0d1511 !important; }
+            .promoCard { background:#17221c !important; border-color:#3f5245 !important; }
+            .promoCard h1,.promoCard label { color:#f4f6f2 !important; }
+            .promoCard .authSub { color:#b8c1ba !important; }
+            .promoInput { background:#111b16 !important; color:#f4f6f2 !important; border-color:#4a5a4f !important; }
+            .promoInput::placeholder { color:#aeb9b0 !important; }
+            .promoCode { color:#9be0aa !important; }
+          }
+        `}</style>
+
         <div className="authBrand">
           <img src="/brand/orenza-mark.svg" alt="ORENZA" />
           <div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div>
@@ -78,6 +112,7 @@ export default function PromotionPage() {
           <label style={{ fontWeight: 800, fontSize: 12 }}>
             PROMO CODE
             <input
+              className="promoInput"
               value={code}
               onChange={e => setCode(e.target.value.toUpperCase())}
               autoComplete="off"
@@ -87,16 +122,15 @@ export default function PromotionPage() {
               placeholder="Enter promo code"
               aria-label="Promo code"
               disabled={busy}
-              style={{ marginTop: 8, letterSpacing: '0.04em' }}
             />
           </label>
 
-          <div style={{ fontSize: 12, lineHeight: 1.5, color: '#4f5d50' }}>
-            Approved test promo code: <strong>{TESTER_PROMO_CODE}</strong>
+          <div className="promoCodeLabel" style={{ fontSize: 12, lineHeight: 1.5 }}>
+            Approved test promo code: <strong className="promoCode">{TESTER_PROMO_CODE}</strong>
           </div>
 
-          <button type="button" className="btn full" onClick={activate} disabled={busy || !code.trim()}>
-            {busy ? 'Continuing…' : 'Continue'} <ArrowRight size={17} />
+          <button type="button" className="btn full promoContinue" onClick={activate} disabled={busy || !code.trim()}>
+            {busy ? 'Verifying access…' : 'Continue'} <ArrowRight size={17} />
           </button>
         </div>
 
