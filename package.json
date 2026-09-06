@@ -14,12 +14,10 @@
   "dependencies": {
     "@capacitor/android": "^7.4.3",
     "@capacitor/app": "^7.1.0",
-    "@capacitor/barcode-scanner": "^2.2.1",
     "@capacitor/browser": "^7.0.0",
     "@capacitor/core": "^7.4.3",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
-    "@zxing/browser": "latest",
     "lucide-react": "latest",
     "next": "latest",
     "nodemailer": "^9.1.1",
