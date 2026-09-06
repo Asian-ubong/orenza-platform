@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const password = String(body.password || '');
 
     if (fullName.length < 2) return NextResponse.json({ error: 'Enter your full legal name.' }, { status: 400 });
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
     if (!phone || phone.includes('@')) return NextResponse.json({ error: 'Enter a valid phone number.' }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
 
@@ -78,33 +78,57 @@ export async function POST(req: Request) {
       }
 
       if (!user) return NextResponse.json({ error: 'Account creation failed.' }, { status: 400 });
+
+      // Admin-created users do not receive a client session from createUser.
+      // The browser completes the normal password sign-in after this response.
       return NextResponse.json({ user_id: user.id, email: user.email, authenticated: false, status: 'created' });
     }
 
-    // Fallback path for the current tester environment. The database trigger
-    // auto-confirms email accounts, so Supabase returns a session immediately
-    // and no confirmation/OTP email is sent.
-    const publicClient = publicAuthClient();
-    const { data, error } = await publicClient.auth.signUp({
+    // Tester/public path. The database trigger auto-confirms the new email.
+    // If Supabase does not return a session from signUp(), immediately perform
+    // the password sign-in on the server and return the resulting session.
+    // This removes the fragile second network round-trip from the native app.
+    const auth = publicAuthClient();
+    const { data, error } = await auth.auth.signUp({
       email,
       password,
       options: { data: metadata },
     });
 
     if (error) {
+      const message = error.message.toLowerCase();
+      if (message.includes('already registered') || message.includes('already exists')) {
+        return NextResponse.json({ error: 'An account with this email already exists. Log in instead.' }, { status: 409 });
+      }
       console.error('[auth/register] public signUp failed:', error.message);
       return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 });
     }
 
-    if (!data.user || !data.session) {
+    const user = data.user;
+    let session = data.session;
+
+    if (user && !session) {
+      const signedIn = await auth.auth.signInWithPassword({ email, password });
+      if (signedIn.error || !signedIn.data.session) {
+        console.error('[auth/register] immediate sign-in failed:', signedIn.error?.message || 'No session returned');
+        return NextResponse.json({ error: 'Account was created, but the ORENZA session could not be started. Please try again.' }, { status: 503 });
+      }
+      session = signedIn.data.session;
+    }
+
+    if (!user || !session?.access_token || !session.refresh_token) {
       return NextResponse.json({ error: 'Account creation could not start the ORENZA session. Please try again.' }, { status: 503 });
     }
 
     return NextResponse.json({
-      user_id: data.user.id,
-      email: data.user.email,
+      user_id: user.id,
+      email: user.email,
       authenticated: true,
       status: 'created',
+      session: {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      },
     });
   } catch (error) {
     console.error('[auth/register] unexpected error:', error);
