@@ -47,7 +47,14 @@ jobs:
       - name: Build web
         run: npm run build
       - name: Generate Android project
-        run: npx cap sync android
+        run: |
+          if [ -d android ]; then
+            echo "Android platform already exists; synchronizing it."
+          else
+            echo "Android platform is missing; adding Capacitor Android platform."
+            npx cap add android
+          fi
+          npx cap sync android
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
