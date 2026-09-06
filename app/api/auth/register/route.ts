@@ -41,8 +41,8 @@ export async function POST(req: Request) {
     const metadata = { full_name: fullName, phone };
     const admin = serverAdminClient();
 
-    // Preferred production/tester path: server-only Supabase secret key lets us
-    // create and confirm the account without sending an email OTP.
+    // Preferred production path: a server-only Supabase secret creates and
+    // confirms the account without sending an email confirmation message.
     if (admin) {
       const created = await admin.auth.admin.createUser({
         email,
@@ -78,12 +78,12 @@ export async function POST(req: Request) {
       }
 
       if (!user) return NextResponse.json({ error: 'Account creation failed.' }, { status: 400 });
-      return NextResponse.json({ user_id: user.id, email: user.email, authenticated: false, otp_required: false, status: 'created' });
+      return NextResponse.json({ user_id: user.id, email: user.email, authenticated: false, status: 'created' });
     }
 
-    // Fallback: the Supabase publishable key is intentionally safe for server-side
-    // sign-up. This keeps tester onboarding working even when the server-only
-    // service-role/secret key has not yet been added to Vercel.
+    // Fallback path for the current tester environment. The database trigger
+    // auto-confirms email accounts, so Supabase returns a session immediately
+    // and no confirmation/OTP email is sent.
     const publicClient = publicAuthClient();
     const { data, error } = await publicClient.auth.signUp({
       email,
@@ -96,23 +96,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 });
     }
 
-    if (!data.user) return NextResponse.json({ error: 'Account creation failed.' }, { status: 400 });
-
-    // A session means email confirmation is disabled and the tester can proceed
-    // immediately. If Supabase requires confirmation, do not pretend the account
-    // is ready: the server-only secret must be configured for auto-confirm.
-    if (!data.session) {
-      return NextResponse.json(
-        { error: 'Tester registration requires email verification in the current Supabase configuration. The no-OTP tester path needs email confirmation disabled or the server-only Supabase secret configured.' },
-        { status: 503 },
-      );
+    if (!data.user || !data.session) {
+      return NextResponse.json({ error: 'Account creation could not start the ORENZA session. Please try again.' }, { status: 503 });
     }
 
     return NextResponse.json({
       user_id: data.user.id,
       email: data.user.email,
       authenticated: true,
-      otp_required: false,
       status: 'created',
     });
   } catch (error) {
