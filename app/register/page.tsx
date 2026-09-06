@@ -57,8 +57,8 @@ export default function RegisterPage() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || `Registration failed (${response.status}).`);
 
-      // The signup path intentionally skips email OTP. Establish the Supabase
-      // session immediately, then take the new account to the promo scanner.
+      // Registration is intentionally a single-step account-creation flow.
+      // No email OTP or verification screen is used here.
       const supabase = getSupabaseBrowser();
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
@@ -92,17 +92,17 @@ export default function RegisterPage() {
   return <main className="authCanvas"><section className="authCard">
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">ACCOUNT REGISTRATION</p><h1>Create your Orenza account</h1>
-    <p className="authSub">Create your account and continue directly to the ORENZA promotion-code scanner. Email OTP is not required for this tester onboarding path.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Your account is created immediately. The next step is the approved promotion-code scanner for tester access.</span></div>
+    <p className="authSub">Enter your details below and your ORENZA account will be created immediately. No email OTP or verification step is required.</p>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Submit the form once. Your account is created immediately and you continue directly to the approved promotion-code scanner.</span></div>
     <form onSubmit={register} className="authForm">
       <label>Full name<input value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" placeholder="Full name" required /></label>
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
       <label>Phone number<input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="+234 ..." required /></label>
       <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} required /></label>
-      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account…':'Register and continue'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy}>{busy?'Creating account…':'Create account and continue'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">Already registered? <Link href="/login">Log in</Link></div>
-    <div className="splashTrust"><ShieldCheck size={16}/><span>Tester promotion access remains separate from KYC, real-money trading and withdrawals.</span></div>
+    <div className="splashTrust"><ShieldCheck size={16}/><span>Account creation is separate from tester authorization, KYC, real-money trading and withdrawals.</span></div>
   </section></main>;
 }
