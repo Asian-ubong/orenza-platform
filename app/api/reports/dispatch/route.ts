@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { sendOrenzaEmail } from '@/lib/reports/mailer';
 
 export const runtime = 'nodejs';
 
@@ -19,24 +20,13 @@ function validSignature(raw: string, timestamp: string | null, signature: string
   try { return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature)); } catch { return false; }
 }
 
-async function send(to: string, subject: string, text: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return false;
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], subject, text }),
-  });
-  return response.ok;
-}
-
 export async function POST(req: Request) {
   const raw = await req.text();
   if (!validSignature(raw, req.headers.get('x-orenza-report-timestamp'), req.headers.get('x-orenza-report-signature'))) {
     return NextResponse.json({ error: 'Unauthorized report dispatch.' }, { status: 401 });
   }
-  const body = JSON.parse(raw);
+  let body: Record<string, unknown>;
+  try { body = JSON.parse(raw) as Record<string, unknown>; } catch { return NextResponse.json({ error: 'Invalid report payload.' }, { status: 400 }); }
   const source = String(body.source || 'system');
   const status = String(body.status || 'unknown').toUpperCase();
   const store = db();
@@ -45,7 +35,7 @@ export async function POST(req: Request) {
   const recipients = (subscribers || []).filter(s => Array.isArray(s.report_sources) && s.report_sources.includes(source));
   const title = String(body.title || `${source} report`);
   const lines = [
-    `ORENZA OPERATIONAL REPORT`,
+    'ORENZA OPERATIONAL REPORT',
     `Source: ${source}`,
     `Status: ${status}`,
     `Workflow/service: ${String(body.name || 'ORENZA')}`,
@@ -61,9 +51,15 @@ export async function POST(req: Request) {
     'ORENZA reports never intentionally include secrets, passwords, OTP values, private keys, or full KYC documents.',
   ].join('\n');
   let sent = 0;
+  let configured = true;
   for (const subscriber of recipients) {
-    if (await send(subscriber.email, `[ORENZA] ${status}: ${title}`, lines)) sent++;
+    const result = await sendOrenzaEmail({ to: subscriber.email, subject: `[ORENZA] ${status}: ${title}`, text: lines });
+    configured = configured && result.configured;
+    if (result.ok) sent++;
   }
-  if (recipients.length) await store.from('orenza_report_subscriptions').update({ last_report_sent_at: new Date().toISOString() }).in('id', recipients.map(r => r.id));
+  if (recipients.length && sent > 0) {
+    await store.from('orenza_report_subscriptions').update({ last_report_sent_at: new Date().toISOString() }).in('id', recipients.filter((_, i) => i < sent).map(r => r.id));
+  }
+  if (recipients.length && !configured) return NextResponse.json({ error: 'SMTP2GO email transport is not configured.' }, { status: 503 });
   return NextResponse.json({ ok: true, recipients: recipients.length, sent });
 }
