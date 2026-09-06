@@ -62,16 +62,27 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease bundleRelease
       - name: Validate Android artifacts
+        shell: bash
         run: |
-          test -s android/app/build/outputs/apk/debug/app-debug.apk
-          test -s android/app/build/outputs/apk/release/app-release.apk
-          test -s android/app/build/outputs/bundle/release/app-release.aab
+          set -euo pipefail
+          debug_apk=$(find android/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
+          release_apk=$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name 'app-release*.apk' -print -quit)
+          release_aab=$(find android/app/build/outputs/bundle/release -maxdepth 1 -type f -name 'app-release*.aab' -print -quit)
+
+          test -n "$debug_apk" && test -s "$debug_apk"
+          test -n "$release_apk" && test -s "$release_apk"
+          test -n "$release_aab" && test -s "$release_aab"
+
+          mkdir -p artifacts
+          cp "$debug_apk" artifacts/orenza-debug.apk
+          cp "$release_apk" artifacts/orenza-release.apk
+          cp "$release_aab" artifacts/orenza-release.aab
+
+          echo "Validated Android artifacts:"
+          ls -lh artifacts/orenza-debug.apk artifacts/orenza-release.apk artifacts/orenza-release.aab
       - name: Package Android artifacts
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/orenza-debug.apk
-          cp android/app/build/outputs/apk/release/app-release.apk artifacts/orenza-release.apk
-          cp android/app/build/outputs/bundle/release/app-release.aab artifacts/orenza-release.aab
           sha256sum artifacts/orenza-debug.apk artifacts/orenza-release.apk artifacts/orenza-release.aab > artifacts/orenza-android.sha256
           zip -j artifacts/orenza-android-package.zip artifacts/orenza-debug.apk artifacts/orenza-release.apk artifacts/orenza-release.aab artifacts/orenza-android.sha256
       - name: Upload source and Android package
