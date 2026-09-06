@@ -59,12 +59,23 @@ jobs:
           fi
           npx cap sync android
       - name: Set up Java 21
+        id: setup-java
         uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+          java-package: jdk
           cache: gradle
-      - name: Verify Java toolchain
+      - name: Force Java 21 environment
+        run: |
+          set -eux
+          JAVA21_HOME="${{ steps.setup-java.outputs.path }}"
+          test -d "$JAVA21_HOME"
+          echo "JAVA_HOME=$JAVA21_HOME" >> "$GITHUB_ENV"
+          echo "$JAVA21_HOME/bin" >> "$GITHUB_PATH"
+          echo "Configured Java home: $JAVA21_HOME"
+      - name: Verify Java and Gradle toolchain
+        working-directory: android
         run: |
           set -eux
           echo "JAVA_HOME=$JAVA_HOME"
@@ -74,6 +85,8 @@ jobs:
           javac -version
           test "$(java -version 2>&1 | awk -F'[\".]' '/version/ {print $2}')" = "21"
           test "$(javac -version 2>&1 | awk '{print $2}' | cut -d. -f1)" = "21"
+          ./gradlew --no-daemon -version
+          ./gradlew --no-daemon -version 2>&1 | grep -E 'JVM:.*21|JVM: 21'
       - name: Build debug APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
