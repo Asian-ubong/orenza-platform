@@ -35,7 +35,9 @@ export async function POST(req: Request) {
     const created = await db.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      // Signup intentionally does not pause on email OTP. Email verification can
+      // be reintroduced later without blocking the tester onboarding path.
+      email_confirm: true,
       user_metadata: metadata,
     });
 
@@ -47,8 +49,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 });
       }
 
-      // A previous attempt may have created the account but failed before OTP delivery.
-      // Reuse only an unconfirmed account; never overwrite an already verified account.
       const existing = await db.auth.admin.getUserByEmail(email);
       const existingUser = existing.data.user;
       if (!existingUser) return NextResponse.json({ error: 'An account with this email already exists. Log in instead.' }, { status: 409 });
@@ -56,6 +56,7 @@ export async function POST(req: Request) {
 
       const repaired = await db.auth.admin.updateUserById(existingUser.id, {
         password,
+        email_confirm: true,
         user_metadata: metadata,
       });
       if (repaired.error || !repaired.data.user) {
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
       user_id: user.id,
       email: user.email,
       authenticated: false,
-      otp_required: true,
+      otp_required: false,
       status: 'created',
     });
   } catch {
