@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { sendOrenzaEmail } from '@/lib/reports/mailer';
 
 export const runtime = 'nodejs';
 
@@ -11,19 +12,6 @@ function validSignature(raw: string, timestamp: string | null, signature: string
   if (!Number.isFinite(age) || age > 5 * 60_000) return false;
   const expected = crypto.createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex');
   try { return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature)); } catch { return false; }
-}
-
-async function send(to: string, subject: string, text: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return false;
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject, text }),
-    });
-    return response.ok;
-  } catch { return false; }
 }
 
 export async function POST(req: Request) {
@@ -42,10 +30,17 @@ export async function POST(req: Request) {
   const message = error ? 'Supabase connectivity/table health check failed.' : `Supabase operational health check passed. Report subscription records: ${count ?? 0}.`;
   const { data: subscribers } = await db.from('orenza_report_subscriptions').select('id,email').eq('enabled', true).not('verified_at', 'is', null);
   let sent = 0;
+  let configured = true;
   if (subscribers?.length) {
-    const text = [`ORENZA SUPABASE HEALTH REPORT`, `Status: ${status}`, `Latency: ${latencyMs} ms`, `Time: ${new Date().toISOString()}`, '', message, '', 'Operational status only; secrets and sensitive user data are excluded.'].join('\n');
-    for (const subscriber of subscribers) if (await send(subscriber.email, `[ORENZA] ${status}: Supabase health`, text)) sent++;
-    await db.from('orenza_report_subscriptions').update({ last_report_sent_at: new Date().toISOString() }).in('id', subscribers.map(s => s.id));
+    const text = ['ORENZA SUPABASE HEALTH REPORT', `Status: ${status}`, `Latency: ${latencyMs} ms`, `Time: ${new Date().toISOString()}`, '', message, '', 'Operational status only; secrets and sensitive user data are excluded.'].join('\n');
+    const sentIds: string[] = [];
+    for (const subscriber of subscribers) {
+      const result = await sendOrenzaEmail({ to: subscriber.email, subject: `[ORENZA] ${status}: Supabase health`, text });
+      configured = configured && result.configured;
+      if (result.ok) { sent++; sentIds.push(subscriber.id); }
+    }
+    if (sentIds.length) await db.from('orenza_report_subscriptions').update({ last_report_sent_at: new Date().toISOString() }).in('id', sentIds);
   }
+  if (subscribers?.length && !configured) return NextResponse.json({ ok: false, status: 'EMAIL_NOT_CONFIGURED', latency_ms: latencyMs, sent }, { status: 503 });
   return NextResponse.json({ ok: !error, status, latency_ms: latencyMs, sent }, { status: error ? 503 : 200 });
 }
