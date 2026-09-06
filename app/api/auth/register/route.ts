@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+const FALLBACK_SUPABASE_URL = 'https://snqfmhvumqpizjhqopoh.supabase.co';
+const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_mHevxxxy7xzWvcx4JxVp5w_6xgRLhVQ';
+
 function serverAdminClient() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
+  if (!key) return null;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
 
 function publicAuthClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
+  const key = (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    FALLBACK_SUPABASE_PUBLISHABLE_KEY
+  );
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
@@ -75,17 +81,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ user_id: user.id, email: user.email, authenticated: false, otp_required: false, status: 'created' });
     }
 
-    // Safe fallback for environments where the server-only key has not yet been
-    // added. This uses only the browser-safe publishable key. It works when
-    // Supabase email confirmation is disabled, which is the intended tester mode.
+    // Fallback: the Supabase publishable key is intentionally safe for server-side
+    // sign-up. This keeps tester onboarding working even when the server-only
+    // service-role/secret key has not yet been added to Vercel.
     const publicClient = publicAuthClient();
-    if (!publicClient) {
-      return NextResponse.json(
-        { error: 'Registration is temporarily unavailable because Supabase authentication is not configured on the server.' },
-        { status: 503 },
-      );
-    }
-
     const { data, error } = await publicClient.auth.signUp({
       email,
       password,
@@ -101,10 +100,10 @@ export async function POST(req: Request) {
 
     // A session means email confirmation is disabled and the tester can proceed
     // immediately. If Supabase requires confirmation, do not pretend the account
-    // is ready: the server-only secret must be configured to support auto-confirm.
+    // is ready: the server-only secret must be configured for auto-confirm.
     if (!data.session) {
       return NextResponse.json(
-        { error: 'Tester registration needs server authentication configuration before it can continue without email verification.' },
+        { error: 'Tester registration requires email verification in the current Supabase configuration. The no-OTP tester path needs email confirmation disabled or the server-only Supabase secret configured.' },
         { status: 503 },
       );
     }
