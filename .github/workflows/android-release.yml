@@ -138,7 +138,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: |
-            set -euxo pipefail
+            set -eux
             adb start-server
             adb wait-for-device
             for i in {1..60}; do
