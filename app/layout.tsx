@@ -16,5 +16,5 @@ export const metadata = {
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><head><meta name="color-scheme" content="light dark" /><link rel="stylesheet" href="/brand/brand-overrides.css" /></head><body>{children}<UpdateNotice /><ServiceWorkerRegister /></body></html>;
+  return <html lang="en"><head><meta name="color-scheme" content="light dark" /></head><body>{children}<UpdateNotice /><ServiceWorkerRegister /></body></html>;
 }
