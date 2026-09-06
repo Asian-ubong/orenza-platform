@@ -28,6 +28,16 @@ for (const path of ['/admin', '/admin/payout-approvals', '/api/admin/approvals']
   if (!blocked) failures += 1;
 }
 
+const payoutApi = await fetch(`${base}/api/payout/withdraw`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ user_id: '00000000-0000-0000-0000-000000000001', amount: 1 }),
+  redirect: 'manual',
+});
+const payoutBlocked = payoutApi.status === 401;
+console.log(`${payoutBlocked ? 'PASS' : 'FAIL'} unauthenticated profit payout is blocked: ${payoutApi.status}`);
+if (!payoutBlocked) failures += 1;
+
 const version = await fetch(`${base}/api/version`, { redirect: 'manual' });
 const cacheControl = version.headers.get('cache-control') || '';
 const noStore = cacheControl.toLowerCase().includes('no-store');
