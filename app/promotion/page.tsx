@@ -2,9 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Camera, CheckCircle2, LockKeyhole, QrCode, ShieldCheck, X } from 'lucide-react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
 import { Capacitor } from '@capacitor/core';
-import { CapacitorBarcodeScanner, CapacitorBarcodeScannerCameraDirection, CapacitorBarcodeScannerScanOrientation, CapacitorBarcodeScannerTypeHint } from '@capacitor/barcode-scanner';
+import {
+  CapacitorBarcodeScanner,
+  CapacitorBarcodeScannerAndroidScanningLibrary,
+  CapacitorBarcodeScannerCameraDirection,
+  CapacitorBarcodeScannerScanOrientation,
+  CapacitorBarcodeScannerTypeHint,
+} from '@capacitor/barcode-scanner';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 import { getSupabaseBrowser } from '../../lib/supabase-browser';
 import { useRouter } from 'next/navigation';
 
@@ -42,46 +48,44 @@ export default function PromotionPage() {
     setScanning(false);
   }
 
-  async function startScanner() {
+  async function startNativeScanner() {
     setError('');
     setMessage('');
-
-    // On the installed Capacitor app, use the native scanner so tapping Scan
-    // immediately opens the phone's native QR scanning camera UI and requests
-    // camera permission when needed. The browser-only ZXing scanner remains the
-    // fallback for the website/PWA.
-    if (Capacitor.isNativePlatform()) {
-      try {
-        setScanning(true);
-        setMessage('Opening your QR scanner…');
-        const result = await CapacitorBarcodeScanner.scanBarcode({
-          hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
-          cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-          scanOrientation: CapacitorBarcodeScannerScanOrientation.PORTRAIT,
-          scanInstructions: 'Point your camera at the ORENZA promotion QR code.',
-          scanText: 'Scan QR code',
-          cancelButtonAccessibilityLabel: 'Cancel QR scanner',
-        });
-        const nextCode = extractCode(result.ScanResult || '');
-        if (nextCode) {
-          setCode(nextCode);
-          setMessage('Promotion code detected.');
-        } else {
-          setMessage('Scanner closed. You can scan again or enter the code manually.');
-        }
-      } catch (e) {
-        const messageText = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
-        if (messageText.includes('permission') || messageText.includes('denied')) {
-          setError('Camera permission is required to scan the QR code. Allow camera access for ORENZA in your phone settings, then try again.');
-        } else {
-          setError('Unable to open the phone QR scanner. Please try again or enter the promotion code manually.');
-        }
-      } finally {
-        setScanning(false);
+    setScanning(true);
+    try {
+      const result = await CapacitorBarcodeScanner.scanBarcode({
+        hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
+        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+        scanOrientation: CapacitorBarcodeScannerScanOrientation.PORTRAIT,
+        scanInstructions: 'Point your camera at the ORENZA promotion QR code.',
+        scanText: 'Scan QR code',
+        cancelButtonAccessibilityLabel: 'Cancel QR scanner',
+        android: {
+          scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.ZXING,
+        },
+      });
+      const nextCode = extractCode(result.ScanResult || '');
+      if (nextCode) {
+        setCode(nextCode);
+        setMessage('Promotion code detected.');
+      } else {
+        setMessage('Scanner closed. You can scan again or enter the code manually.');
       }
-      return;
+    } catch (e) {
+      const messageText = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+      if (messageText.includes('permission') || messageText.includes('denied')) {
+        setError('Camera permission is required to scan the QR code. Allow camera access for ORENZA in your phone settings, then try again.');
+      } else {
+        setError('Unable to open the phone QR scanner. Please try again or enter the promotion code manually.');
+      }
+    } finally {
+      setScanning(false);
     }
+  }
 
+  async function startWebScanner() {
+    setError('');
+    setMessage('');
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Camera access is not available in this browser. Enter the promotion code manually below.');
       return;
@@ -110,7 +114,18 @@ export default function PromotionPage() {
       controlsRef.current = controls;
     } catch (e) {
       stopWebScanner();
-      setError(e instanceof Error && e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow camera access for ORENZA in your browser settings and try again.' : 'Unable to start the phone camera. You can enter the promotion code manually.');
+      setError(e instanceof Error && e.name === 'NotAllowedError'
+        ? 'Camera permission was denied. Allow camera access for ORENZA in your browser settings and try again.'
+        : 'Unable to start the phone camera. You can enter the promotion code manually.');
+    }
+  }
+
+  async function startScanner() {
+    if (scanning || busy) return;
+    if (Capacitor.isNativePlatform()) {
+      await startNativeScanner();
+    } else {
+      await startWebScanner();
     }
   }
 
@@ -147,6 +162,8 @@ export default function PromotionPage() {
     }
   }
 
+  const nativeScanner = Capacitor.isNativePlatform();
+
   return <main className="authCanvas"><section className="authCard otpCard" style={{maxWidth:680}}>
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <div className="otpIcon"><QrCode size={26}/></div>
@@ -154,9 +171,15 @@ export default function PromotionPage() {
     <h1>Activate your ORENZA test access</h1>
     <p className="authSub">Your account is verified. Now scan the approved promotion QR code or enter the promotion code supplied to you. This is the final gate before the test dashboard.</p>
     <div className="authNotice"><LockKeyhole size={17}/><span>Promotion access is separate from authentication, KYC and any future real-money authorization. The current test environment uses sandbox/demo activity only.</span></div>
-    <div style={{marginTop:20,padding:14,border:'1px solid #e1d9c9',borderRadius:14,background:'#FAF9F6'}}>
-      {scanning && !Capacitor.isNativePlatform() ? <><video ref={videoRef} autoPlay playsInline muted aria-label="Promotion QR scanner" style={{width:'100%',maxHeight:360,objectFit:'cover',borderRadius:12,background:'#05080c'}}/><button type="button" className="textButton" onClick={stopWebScanner}><X size={15}/> Stop scanner</button></> : <div style={{height:150,display:'grid',placeItems:'center',borderRadius:12,background:'#0B192B',color:'#fff'}}><QrCode size={52}/></div>}
-    </div>
+    <button
+      type="button"
+      onClick={startScanner}
+      disabled={scanning || busy}
+      aria-label="Open ORENZA QR scanner"
+      style={{marginTop:20,width:'100%',padding:14,border:'1px solid #e1d9c9',borderRadius:14,background:'#FAF9F6',cursor:scanning || busy ? 'default' : 'pointer',borderStyle:'solid'}}
+    >
+      {scanning && !nativeScanner ? <><video ref={videoRef} autoPlay playsInline muted aria-label="Promotion QR scanner" style={{width:'100%',maxHeight:360,objectFit:'cover',borderRadius:12,background:'#05080c'}}/><span className="textButton"><X size={15}/> Stop scanner</span></> : <span style={{height:150,display:'grid',placeItems:'center',borderRadius:12,background:'#0B192B',color:'#fff'}}><QrCode size={52}/></span>}
+    </button>
     <div style={{display:'grid',gap:10,marginTop:16}}>
       <button type="button" className="btn full" onClick={startScanner} disabled={scanning || busy}><Camera size={17}/> {scanning ? 'Opening scanner…' : 'Scan promotion QR code'}</button>
       <label style={{fontWeight:800,fontSize:12}}>Promotion code<input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} autoComplete="off" inputMode="text" placeholder="Enter code if you cannot scan" /></label>
