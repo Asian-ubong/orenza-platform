@@ -137,25 +137,7 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_6
-          script: |
-            set -eux
-            adb start-server
-            adb wait-for-device
-            i=1
-            while [ "$i" -le 60 ]; do
-              state=$(adb get-state 2>/dev/null || true)
-              if [ "$state" = "device" ]; then break; fi
-              adb reconnect offline || true
-              sleep 2
-              i=$((i + 1))
-            done
-            test "$(adb get-state)" = "device"
-            test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
-            adb install --no-streaming -r artifacts/orenza-debug.apk
-            adb shell monkey -p com.orenzatech.orenza 1
-            sleep 8
-            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
-            adb shell am force-stop com.orenzatech.orenza
+          script: adb wait-for-device && test "$(adb get-state)" = "device" && test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" && adb install --no-streaming -r artifacts/orenza-debug.apk && adb shell monkey -p com.orenzatech.orenza 1 && sleep 8 && adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' && adb shell am force-stop com.orenzatech.orenza
 
   release:
     if: ${{ startsWith(github.event.head_commit.message, 'release(android):') || github.event_name == 'workflow_dispatch' }}
