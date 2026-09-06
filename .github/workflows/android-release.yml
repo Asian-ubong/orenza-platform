@@ -138,7 +138,20 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: |
-            adb install -r artifacts/orenza-debug.apk
+            set -euxo pipefail
+            adb start-server
+            adb wait-for-device
+            for i in {1..60}; do
+              state=$(adb get-state 2>/dev/null || true)
+              if [ "$state" = "device" ]; then
+                break
+              fi
+              adb reconnect offline || true
+              sleep 2
+            done
+            test "$(adb get-state)" = "device"
+            adb shell getprop sys.boot_completed
+            adb install --no-streaming -r artifacts/orenza-debug.apk
             adb shell monkey -p com.orenzatech.orenza 1
             sleep 8
             adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
