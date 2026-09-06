@@ -52,14 +52,13 @@ export async function POST(req: Request) {
   ].join('\n');
   let sent = 0;
   let configured = true;
+  const sentIds: string[] = [];
   for (const subscriber of recipients) {
     const result = await sendOrenzaEmail({ to: subscriber.email, subject: `[ORENZA] ${status}: ${title}`, text: lines });
     configured = configured && result.configured;
-    if (result.ok) sent++;
+    if (result.ok) { sent++; sentIds.push(subscriber.id); }
   }
-  if (recipients.length && sent > 0) {
-    await store.from('orenza_report_subscriptions').update({ last_report_sent_at: new Date().toISOString() }).in('id', recipients.filter((_, i) => i < sent).map(r => r.id));
-  }
+  if (sentIds.length) await store.from('orenza_report_subscriptions').update({ last_report_sent_at: new Date().toISOString() }).in('id', sentIds);
   if (recipients.length && !configured) return NextResponse.json({ error: 'SMTP2GO email transport is not configured.' }, { status: 503 });
   return NextResponse.json({ ok: true, recipients: recipients.length, sent });
 }
