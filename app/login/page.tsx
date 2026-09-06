@@ -32,34 +32,14 @@ export default function LoginPage() {
       if (authError) throw authError;
       if (!data.user || !data.session?.access_token) throw new Error('Login could not be verified.');
 
-      const otpResponse = await fetch('/api/auth/email-otp/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${data.session.access_token}`,
-        },
-        body: JSON.stringify({ email: normalizedEmail, purpose: 'login', user_id: data.user.id }),
-      });
-      const otpResult = await otpResponse.json().catch(() => ({}));
-      if (!otpResponse.ok) {
-        await supabase.auth.signOut();
-        throw new Error(otpResult.error || 'Email verification is currently unavailable.');
-      }
-      if (!otpResult.challenge_id) {
-        await supabase.auth.signOut();
-        throw new Error('A verification challenge was not created.');
-      }
-
       sessionStorage.setItem('orenza_pending_email', normalizedEmail);
       sessionStorage.setItem('orenza_auth_flow', 'login');
       sessionStorage.setItem('orenza_pending_user_id', data.user.id);
-      sessionStorage.setItem('orenza_auth_challenge_id', otpResult.challenge_id);
       localStorage.setItem('orenza_pending_email', normalizedEmail);
       localStorage.setItem('orenza_auth_flow', 'login');
       localStorage.setItem('orenza_pending_user_id', data.user.id);
-      localStorage.setItem('orenza_auth_challenge_id', otpResult.challenge_id);
 
-      router.replace(`/verify?email=${encodeURIComponent(normalizedEmail)}&flow=login&challenge=${encodeURIComponent(otpResult.challenge_id)}`);
+      router.replace('/promotion');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login could not be completed.');
     } finally {
@@ -70,15 +50,15 @@ export default function LoginPage() {
   return <main className="authCanvas"><section className="authCard">
     <div className="authBrand"><img src="/brand/orenza-mark.svg" alt="ORENZA" /><div><b>ORENZA</b><span>TRADE. GROW. SUCCEED.</span></div></div>
     <p className="eyebrow">SECURE LOGIN</p><h1>Welcome back</h1>
-    <p className="authSub">Sign in with your credentials, then complete the one-time email verification before entering your ORENZA workspace.</p>
-    <div className="authNotice"><LockKeyhole size={17}/><span>Your password establishes the account session; a separate one-time verification code is required before workspace access.</span></div>
+    <p className="authSub">Sign in with your email and password to continue to your ORENZA workspace.</p>
+    <div className="authNotice"><LockKeyhole size={17}/><span>Your password authenticates the account. No email OTP or verification-code step is used for login.</span></div>
     <form onSubmit={login} className="authForm">
       <label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required /></label>
       <label>Password<input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" placeholder="Your password" required /></label>
-      <button className="btn full authSubmit" disabled={busy}>{busy?'Signing in…':'Continue to verification'} <ArrowRight size={17}/></button>
+      <button className="btn full authSubmit" disabled={busy}>{busy?'Signing in…':'Sign in and continue'} <ArrowRight size={17}/></button>
     </form>
     {error && <div className="authError" role="alert">{error}</div>}
     <div className="authFooter">New to Orenza? <Link href="/register">Create an account</Link></div>
-    <div className="splashTrust"><ShieldCheck size={16}/><span>Authentication, one-time verification, tester authorization, KYC approval and withdrawal authorization remain separate controls.</span></div>
+    <div className="splashTrust"><ShieldCheck size={16}/><span>Authentication, tester authorization, KYC approval and withdrawal authorization remain separate controls.</span></div>
   </section></main>;
 }
