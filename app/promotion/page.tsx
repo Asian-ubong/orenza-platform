@@ -34,11 +34,9 @@ export default function PromotionPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    return () => {
-      controlsRef.current?.stop();
-      readerRef.current?.reset();
-    };
+  useEffect(() => () => {
+    controlsRef.current?.stop();
+    readerRef.current?.reset();
   }, []);
 
   function stopWebScanner() {
@@ -48,46 +46,11 @@ export default function PromotionPage() {
     setScanning(false);
   }
 
-  async function startNativeScanner() {
-    setError('');
-    setMessage('');
-    setScanning(true);
-    try {
-      const result = await CapacitorBarcodeScanner.scanBarcode({
-        hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
-        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
-        scanOrientation: CapacitorBarcodeScannerScanOrientation.PORTRAIT,
-        scanInstructions: 'Point your camera at the ORENZA promotion QR code.',
-        scanText: 'Scan QR code',
-        cancelButtonAccessibilityLabel: 'Cancel QR scanner',
-        android: {
-          scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.ZXING,
-        },
-      });
-      const nextCode = extractCode(result.ScanResult || '');
-      if (nextCode) {
-        setCode(nextCode);
-        setMessage('Promotion code detected.');
-      } else {
-        setMessage('Scanner closed. You can scan again or enter the code manually.');
-      }
-    } catch (e) {
-      const messageText = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
-      if (messageText.includes('permission') || messageText.includes('denied')) {
-        setError('Camera permission is required to scan the QR code. Allow camera access for ORENZA in your phone settings, then try again.');
-      } else {
-        setError('Unable to open the phone QR scanner. Please try again or enter the promotion code manually.');
-      }
-    } finally {
-      setScanning(false);
-    }
-  }
-
   async function startWebScanner() {
     setError('');
     setMessage('');
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError('Camera access is not available in this browser. Enter the promotion code manually below.');
+      setError('Camera access is not available here. Enter the promotion code manually below.');
       return;
     }
     try {
@@ -107,7 +70,7 @@ export default function PromotionPage() {
               stopWebScanner();
             }
           } else if (scanError && scanError.name !== 'NotFoundException') {
-            // Individual frame misses are expected while scanning.
+            // Normal frame-by-frame misses while searching for a QR code.
           }
         },
       );
@@ -115,8 +78,50 @@ export default function PromotionPage() {
     } catch (e) {
       stopWebScanner();
       setError(e instanceof Error && e.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Allow camera access for ORENZA in your browser settings and try again.'
-        : 'Unable to start the phone camera. You can enter the promotion code manually.');
+        ? 'Camera permission was denied. Allow camera access for ORENZA and try again.'
+        : 'Unable to start the camera. You can enter the promotion code manually.');
+    }
+  }
+
+  async function startNativeScanner() {
+    setError('');
+    setMessage('Opening the ORENZA QR scanner…');
+    setScanning(true);
+    try {
+      const result = await CapacitorBarcodeScanner.scanBarcode({
+        hint: CapacitorBarcodeScannerTypeHint.QR_CODE,
+        cameraDirection: CapacitorBarcodeScannerCameraDirection.BACK,
+        scanOrientation: CapacitorBarcodeScannerScanOrientation.PORTRAIT,
+        scanInstructions: 'Point your camera at the ORENZA promotion QR code.',
+        scanText: 'Scan QR code',
+        cancelButtonAccessibilityLabel: 'Cancel QR scanner',
+        android: {
+          scanningLibrary: CapacitorBarcodeScannerAndroidScanningLibrary.MLKIT,
+        },
+      });
+      const nextCode = extractCode(result.ScanResult || '');
+      if (nextCode) {
+        setCode(nextCode);
+        setMessage('Promotion code detected.');
+      } else {
+        setMessage('Scanner closed. You can scan again or enter the code manually.');
+      }
+      setScanning(false);
+    } catch (e) {
+      setScanning(false);
+      const text = e instanceof Error ? e.message.toLowerCase() : String(e).toLowerCase();
+      if (text.includes('permission') || text.includes('denied')) {
+        setError('Camera permission is required. Allow camera access for ORENZA in your phone settings, then try again.');
+        return;
+      }
+      // Native scanner failed: immediately fall back to the in-app camera scanner
+      // instead of leaving the tester at a dead end.
+      if (navigator.mediaDevices?.getUserMedia) {
+        setMessage('Opening the in-app camera scanner…');
+        await startWebScanner();
+      } else {
+        setError('Unable to open the QR scanner. Enter the promotion code manually below.');
+      }
     }
   }
 
@@ -171,13 +176,7 @@ export default function PromotionPage() {
     <h1>Activate your ORENZA test access</h1>
     <p className="authSub">Your account is verified. Now scan the approved promotion QR code or enter the promotion code supplied to you. This is the final gate before the test dashboard.</p>
     <div className="authNotice"><LockKeyhole size={17}/><span>Promotion access is separate from authentication, KYC and any future real-money authorization. The current test environment uses sandbox/demo activity only.</span></div>
-    <button
-      type="button"
-      onClick={startScanner}
-      disabled={scanning || busy}
-      aria-label="Open ORENZA QR scanner"
-      style={{marginTop:20,width:'100%',padding:14,border:'1px solid #e1d9c9',borderRadius:14,background:'#FAF9F6',cursor:scanning || busy ? 'default' : 'pointer',borderStyle:'solid'}}
-    >
+    <button type="button" onClick={startScanner} disabled={scanning || busy} aria-label="Open ORENZA QR scanner" style={{marginTop:20,width:'100%',padding:14,border:'1px solid #e1d9c9',borderRadius:14,background:'#FAF9F6',cursor:scanning || busy ? 'default' : 'pointer'}}>
       {scanning && !nativeScanner ? <><video ref={videoRef} autoPlay playsInline muted aria-label="Promotion QR scanner" style={{width:'100%',maxHeight:360,objectFit:'cover',borderRadius:12,background:'#05080c'}}/><span className="textButton"><X size={15}/> Stop scanner</span></> : <span style={{height:150,display:'grid',placeItems:'center',borderRadius:12,background:'#0B192B',color:'#fff'}}><QrCode size={52}/></span>}
     </button>
     <div style={{display:'grid',gap:10,marginTop:16}}>
