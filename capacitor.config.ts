@@ -9,13 +9,6 @@ const config: CapacitorConfig = {
     cleartext: false,
     androidScheme: 'https',
   },
-  plugins: {
-    CapacitorBarcodeScanner: {
-      android: {
-        scanningLibrary: 'mlkit',
-      },
-    },
-  },
 };
 
 export default config;
