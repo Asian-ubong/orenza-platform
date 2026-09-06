@@ -14,6 +14,9 @@ on:
 permissions:
   contents: read
 
+env:
+  JAVA_VERSION: '21'
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -56,17 +59,24 @@ jobs:
           fi
           npx cap sync android
       - name: Set up Java 21
+        uses: actions/setup-java@19c8f7b3d2f6a9b1d6c7f1e4a4b4f0f0f0f0f0f0 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+      - name: Verify Java toolchain
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y openjdk-21-jdk-headless
-          echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(command -v javac))))" >> "$GITHUB_ENV"
+          set -eux
           java -version
+          javac -version
+          test "$(java -version 2>&1 | awk -F'[\".]' '/version/ {print $2}')" = "21"
+          test "$(javac -version 2>&1 | awk '{print $2}' | cut -d. -f1)" = "21"
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: ./gradlew --no-daemon assembleDebug
       - name: Build release APK and AAB
         working-directory: android
-        run: ./gradlew assembleRelease bundleRelease
+        run: ./gradlew --no-daemon assembleRelease bundleRelease
       - name: Validate Android artifacts
         shell: bash
         run: |
@@ -74,17 +84,13 @@ jobs:
           debug_apk=$(find android/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
           release_apk=$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name 'app-release*.apk' -print -quit)
           release_aab=$(find android/app/build/outputs/bundle/release -maxdepth 1 -type f -name 'app-release*.aab' -print -quit)
-
           test -n "$debug_apk" && test -s "$debug_apk"
           test -n "$release_apk" && test -s "$release_apk"
           test -n "$release_aab" && test -s "$release_aab"
-
           mkdir -p artifacts
           cp "$debug_apk" artifacts/orenza-debug.apk
           cp "$release_apk" artifacts/orenza-release.apk
           cp "$release_aab" artifacts/orenza-release.aab
-
-          echo "Validated Android artifacts:"
           ls -lh artifacts/orenza-debug.apk artifacts/orenza-release.apk artifacts/orenza-release.aab
       - name: Package Android artifacts
         run: |
@@ -122,9 +128,7 @@ jobs:
             i=1
             while [ "$i" -le 60 ]; do
               state=$(adb get-state 2>/dev/null || true)
-              if [ "$state" = "device" ]; then
-                break
-              fi
+              if [ "$state" = "device" ]; then break; fi
               adb reconnect offline || true
               sleep 2
               i=$((i + 1))
