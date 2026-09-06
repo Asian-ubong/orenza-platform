@@ -15,7 +15,12 @@ async function actor() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 'https://snqfmhvumqpizjhqopoh.supabase.co';
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || 'sb_publishable_mHevxxxy7xzWvcx4JxVp5w_6xgRLhVQ';
   const jar = await cookies();
-  const supabase = createServerClient(url, key, { cookies: { getAll: () => jar.getAll(), setAll: () => {} } });
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll: () => jar.getAll(),
+      setAll(items) { items.forEach(({ name, value, options }) => jar.set(name, value, options)); },
+    },
+  });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: access } = await supabase.from('orenza_private_access').select('role,status').eq('user_id', user.id).eq('status', 'ACTIVE').maybeSingle();
@@ -43,17 +48,32 @@ export async function POST(req: Request) {
   const reason = String(body.reason || '').trim().slice(0, 500) || null;
   if (!id || !['APPROVED', 'DECLINED'].includes(decision)) return NextResponse.json({ error: 'Invalid approval decision.' }, { status: 400 });
 
-  const { data: current, error: readError } = await db.from('orenza_payout_requests').select('id,status').eq('id', id).eq('status', 'PENDING').maybeSingle();
-  if (readError) return NextResponse.json({ error: 'Could not verify approval state.' }, { status: 500 });
-  if (!current) return NextResponse.json({ error: 'Approval is no longer pending.' }, { status: 409 });
+  const { data, error } = await db.rpc('orenza_decide_profit_payout', {
+    p_payout_id: id,
+    p_actor_user_id: user.id,
+    p_decision: decision,
+    p_reason: reason,
+  });
 
-  // Owner approval is recorded, but provider execution remains disabled in sandbox-first mode.
-  const nextStatus = decision === 'APPROVED' ? 'PROCESSING' : 'REJECTED';
-  const { data: updated, error: updateError } = await db.from('orenza_payout_requests').update({ status: nextStatus }).eq('id', id).eq('status', 'PENDING').select('id,status').maybeSingle();
-  if (updateError || !updated) return NextResponse.json({ error: 'Approval could not be committed.' }, { status: 409 });
+  if (error) {
+    const message = String(error.message || '');
+    if (message.includes('PAYOUT_NOT_FOUND')) return NextResponse.json({ error: 'Payout request not found.' }, { status: 404 });
+    if (message.includes('PAYOUT_NOT_PENDING')) return NextResponse.json({ error: 'Approval is no longer pending.' }, { status: 409 });
+    if (message.includes('INVALID_DECISION') || message.includes('INVALID_APPROVAL')) return NextResponse.json({ error: 'Invalid approval decision.' }, { status: 400 });
+    console.error('Payout approval error:', error);
+    return NextResponse.json({ error: 'Approval could not be committed.' }, { status: 500 });
+  }
 
-  const { error: auditError } = await db.from('orenza_approval_audit').insert({ target_type: 'PAYOUT', target_id: id, decision, actor_user_id: user.id, previous_status: 'PENDING', new_status: nextStatus, reason });
-  if (auditError) return NextResponse.json({ error: 'Decision committed but audit recording failed; manual review required.' }, { status: 500 });
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result) return NextResponse.json({ error: 'Approval could not be committed.' }, { status: 500 });
 
-  return NextResponse.json({ success: true, decision, status: nextStatus, execution: 'DISABLED' });
+  return NextResponse.json({
+    success: true,
+    decision: result.decision,
+    status: result.status,
+    execution: result.execution,
+    message: result.decision === 'DECLINED'
+      ? 'Payout declined and reserved profit released back to the wallet.'
+      : 'Payout approved and queued. Real-money execution remains disabled in sandbox mode.',
+  });
 }
