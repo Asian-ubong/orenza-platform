@@ -127,7 +127,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
       - name: Download APK artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
+        uses: actions/download-artifact@3e5f45a31266ced268874388b861e4b58bb5c2f3 # v4.1.7
         with:
           name: orenza-android-${{ github.sha }}
           path: artifacts
@@ -158,7 +158,7 @@ jobs:
         with:
           node-version: 22
       - name: Download Android package
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
+        uses: actions/download-artifact@3e5f45a31266ced268874388b861e4b58bb5c2f3 # v4.1.7
         with:
           name: orenza-android-${{ github.sha }}
           path: artifacts
@@ -185,7 +185,7 @@ jobs:
         with:
           node-version: 22
       - name: Download Android package
-        uses: actions/download-artifact@3e5f45a312cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
+        uses: actions/download-artifact@3e5f45a31266ced268874388b861e4b58bb5c2f3 # v4.1.7
         with:
           name: orenza-android-${{ github.sha }}
           path: artifacts
