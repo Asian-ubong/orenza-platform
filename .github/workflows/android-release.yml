@@ -55,6 +55,12 @@ jobs:
             npx cap add android
           fi
           npx cap sync android
+      - name: Set up Java 21
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y openjdk-21-jdk-headless
+          echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(command -v javac))))" >> "$GITHUB_ENV"
+          java -version
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
@@ -139,6 +145,8 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+      - name: Checkout code for release
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
       - name: Set up Node
         uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
