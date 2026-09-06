@@ -3,43 +3,12 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, XCircle } from 'lucide-react';
 
-type Approval = { id: string; user_id: string; wallet_type: string; amount: number; status: string; created_at: string };
+type Approval = { id: string; user_id: string; amount: number; currency: string; payout_method: string; provider_adapter: string; status: string; created_at: string };
 
 export default function PayoutApprovalsPage() {
-  const [items, setItems] = useState<Approval[]>([]);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-
-  async function load() {
-    setError('');
-    const response = await fetch('/api/admin/approvals', { cache: 'no-store' });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) return setError(body.error || 'Could not load approvals.');
-    setItems(body.approvals || []);
-  }
-
+  const [items, setItems] = useState<Approval[]>([]); const [busy, setBusy] = useState<string | null>(null); const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  async function load() { setError(''); const response = await fetch('/api/admin/approvals', { cache: 'no-store' }); const body = await response.json().catch(() => ({})); if (!response.ok) return setError(body.error || 'Could not load approvals.'); setItems(body.approvals || []); }
   useEffect(() => { void load(); }, []);
-
-  async function decide(id: string, decision: 'APPROVED' | 'DECLINED') {
-    setBusy(id); setError(''); setMessage('');
-    try {
-      const response = await fetch('/api/admin/approvals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, decision }) });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Decision failed.');
-      setMessage(decision === 'APPROVED' ? 'Approved. Execution remains disabled by the sandbox safety boundary.' : 'Declined and recorded.');
-      await load();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Decision failed.'); }
-    finally { setBusy(null); }
-  }
-
-  return <main className="section">
-    <header className="pageHead"><div><p className="eyebrow">OWNER APPROVAL CENTER</p><h1>Payout approvals</h1><p className="muted">Review pending requests, make one explicit decision, and keep an auditable approval trail. No real-money payout is executed from this screen.</p></div></header>
-    <div className="warning"><Clock3 size={18}/><span>Every request starts <b>PENDING</b>. Approval changes the request state and records the actor; provider execution remains disabled while ORENZA is sandbox-first.</span></div>
-    {error && <div className="warning"><XCircle size={18}/><span>{error}</span></div>}
-    {message && <div className="warning"><CheckCircle2 size={18}/><span>{message}</span></div>}
-    <div className="card" style={{ overflowX: 'auto' }}>
-      {items.length === 0 ? <p className="muted">No pending payout approvals.</p> : <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th align="left">Request</th><th align="left">User</th><th align="right">Amount</th><th align="left">Wallet</th><th align="left">Created</th><th align="right">Decision</th></tr></thead><tbody>{items.map(item => <tr key={item.id}><td>{item.id.slice(0, 8)}…</td><td>{item.user_id.slice(0, 8)}…</td><td align="right">${Number(item.amount).toFixed(2)}</td><td>{item.wallet_type}</td><td>{new Date(item.created_at).toLocaleString()}</td><td align="right"><button disabled={busy === item.id} onClick={() => void decide(item.id, 'DECLINED')}>Decline</button>{' '}<button disabled={busy === item.id} onClick={() => void decide(item.id, 'APPROVED')}>Approve</button></td></tr>)}</tbody></table>}
-    </div>
-  </main>;
+  async function decide(id: string, decision: 'APPROVED' | 'DECLINED') { setBusy(id); setError(''); setMessage(''); try { const response = await fetch('/api/admin/approvals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, decision }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || 'Decision failed.'); setMessage(decision === 'APPROVED' ? 'Approved. Provider execution remains disabled by the sandbox safety boundary.' : 'Declined and recorded.'); await load(); } catch (e) { setError(e instanceof Error ? e.message : 'Decision failed.'); } finally { setBusy(null); } }
+  return <main className="section"><header className="pageHead"><div><p className="eyebrow">OWNER APPROVAL CENTER</p><h1>Payout approvals</h1><p className="muted">Review pending requests, make one explicit decision, and keep an auditable approval trail. No real-money payout is executed from this screen.</p></div></header><div className="warning"><Clock3 size={18}/><span>Every request starts <b>PENDING</b>. Approval changes the request state and records the actor; provider execution remains disabled while ORENZA is sandbox-first.</span></div>{error && <div className="warning"><XCircle size={18}/><span>{error}</span></div>}{message && <div className="warning"><CheckCircle2 size={18}/><span>{message}</span></div>}<div className="card" style={{ overflowX: 'auto' }}>{items.length === 0 ? <p className="muted">No pending payout approvals.</p> : <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th align="left">Request</th><th align="left">User</th><th align="right">Amount</th><th align="left">Method</th><th align="left">Created</th><th align="right">Decision</th></tr></thead><tbody>{items.map(item => <tr key={item.id}><td>{item.id.slice(0, 8)}…</td><td>{item.user_id.slice(0, 8)}…</td><td align="right">{item.currency} {Number(item.amount).toFixed(2)}</td><td>{item.payout_method}</td><td>{new Date(item.created_at).toLocaleString()}</td><td align="right"><button disabled={busy === item.id} onClick={() => void decide(item.id, 'DECLINED')}>Decline</button>{' '}<button disabled={busy === item.id} onClick={() => void decide(item.id, 'APPROVED')}>Approve</button></td></tr>)}</tbody></table>}</div></main>;
 }
