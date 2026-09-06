@@ -6,6 +6,9 @@ export const dynamic = 'force-dynamic';
 /**
  * Controlled sandbox-only verification. It exercises the real backend RPC chain
  * and never submits a Deriv/MT5/real-money order.
+ *
+ * Tester verification uses a small virtual allocation rather than the KYC-gated
+ * welcome bonus, so backend connectivity can be verified before a user completes KYC.
  */
 export async function POST(request: Request) {
   try {
@@ -16,8 +19,9 @@ export async function POST(request: Request) {
     const requestId = `E2E-${user.id}-${Date.now()}`;
     const orderKey = `${requestId}:ORDER`;
 
-    const allocation = await db.rpc('orenza_issue_sandbox_welcome_bonus', {
-      p_user_id: user.id, p_amount: 5000, p_currency: 'USD', p_idempotency_key: `${user.id}:welcome:5000`,
+    const allocation = await db.rpc('request_sandbox_allocation', {
+      p_amount: 100,
+      p_idempotency_key: `${requestId}:ALLOCATION`,
     });
     if (allocation.error) throw new Error(allocation.error.message);
 
@@ -52,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     return Response.json({ ok: true, mode: 'SANDBOX', real_money_order_submitted: false, steps: {
-      authentication: 'PASS', welcome_allocation: 'PASS', sandbox_trade: 'PASS', settlement: 'PASS', pnl,
+      authentication: 'PASS', sandbox_allocation: 'PASS', sandbox_trade: 'PASS', settlement: 'PASS', pnl,
       reconciliation: settlement.data?.provider_reconciled ? 'PASS' : 'BLOCKED',
       profit_eligibility: eligible ? 'PASS' : 'BLOCKED',
       sandbox_withdrawal_request: payout ? 'PASS' : 'BLOCKED_BY_ELIGIBILITY',
