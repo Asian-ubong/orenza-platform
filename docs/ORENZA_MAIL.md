@@ -1,58 +1,64 @@
-# ORENZA Mail — self-hosted SMTP delivery
+# ORENZA Mail — SMTP2GO delivery
 
-ORENZA does not require Resend. Application emails use the ORENZA SMTP transport in `lib/reports/mailer.ts`.
+ORENZA application and operational-report emails are provider-neutral at the application boundary and currently delivered through **SMTP2GO SMTP**. The transport lives in `lib/reports/mailer.ts`, so the provider can be changed later without rewriting every email route.
 
 ## Architecture
 
 ```text
 ORENZA app (Vercel/Node)
         |
-        | authenticated SMTP
+        | authenticated SMTP / STARTTLS
         v
-ORENZA Mail Server (self-hosted VPS)
+SMTP2GO
         |
-        +--> Postfix SMTP
-        +--> Dovecot mailbox/authentication
-        +--> TLS certificates
-        +--> SPF / DKIM / DMARC
-        +--> DNS MX
+        +--> verified sender domain
+        +--> SPF / DKIM alignment
+        +--> outbound delivery
         v
-Supportdeveloperer@gmail.com / other subscribed recipients
+Recipients (users / report subscribers)
 ```
 
-The SMTP server is the mail infrastructure. Vercel runs the application/API but should not be expected to act as a public SMTP daemon.
+SMTP2GO provides outbound SMTP only. ORENZA does not use SMTP2GO as an incoming mailbox provider.
 
 ## Application environment
 
-Set these production variables in the ORENZA deployment:
+Set these production variables in Vercel/server configuration:
 
-- `SMTP_HOST` — hostname of the ORENZA SMTP server, e.g. `mail.orenzatech.com`
-- `SMTP_PORT` — normally `587` for STARTTLS or `465` for implicit TLS
-- `SMTP_USER` — dedicated ORENZA SMTP account
-- `SMTP_PASSWORD` — SMTP credential; never commit it
-- `SMTP_FROM_EMAIL` — a verified ORENZA mailbox, e.g. `ORENZA Reports <reports@orenzatech.com>`
+- `SMTP_HOST=mail.smtp2go.com`
+- `SMTP_PORT=2525` (STARTTLS; 587 is also supported)
+- `SMTP_USER` — SMTP2GO SMTP User username
+- `SMTP_PASSWORD` — SMTP2GO SMTP User password; never commit it
+- `SMTP_FROM_EMAIL` — a sender approved by SMTP2GO, e.g. `ORENZA <no-reply@orenzatech.com>`
 
-No `RESEND_API_KEY` is required by the ORENZA mail transport.
+SMTP2GO's documented SMTP host is `mail.smtp2go.com`; STARTTLS is supported on port 2525 and 587, while implicit TLS is supported on 465, 8465, and 443. Verify the sender domain in SMTP2GO before production sending.
 
-## Self-hosted server requirements
+## SMTP2GO setup
 
-Use a dedicated Linux VPS with a static public IP. Install and harden a mail stack such as Postfix + Dovecot (or a self-hosted mail-suite that exposes authenticated SMTP). Configure:
+1. Create/sign in to the SMTP2GO account.
+2. Go to **Sending → Verified Senders → Sender Domains**.
+3. Add `orenzatech.com` and publish the DNS records SMTP2GO provides.
+4. Wait until the sender domain is verified.
+5. Go to **Sending → SMTP Users** and create a dedicated ORENZA SMTP user.
+6. Store the SMTP username/password only in Vercel/server environment variables.
+7. Set `SMTP_FROM_EMAIL` to a verified address at `orenzatech.com`.
+8. Test OTP and operational-report delivery before enabling production email-dependent flows.
 
-1. DNS `A/AAAA` for `mail.orenzatech.com`.
-2. DNS `MX` for `orenzatech.com` pointing to the mail host.
-3. SPF authorizing the server IP.
-4. DKIM signing and its DNS public key.
-5. DMARC policy and reporting address.
-6. PTR/rDNS for the VPS IP pointing to the mail hostname.
-7. TLS certificate for the mail hostname.
-8. Authenticated SMTP submission on port 587; do not expose unauthenticated relay.
-9. Firewall rules allowing SMTP submission and required mail-server traffic.
-10. Rate limits, abuse controls, queue monitoring, and backups.
+## Security
 
-## Important limitation
+- SMTP credentials are server-only and must never be exposed to the browser.
+- Do not commit SMTP passwords or API keys.
+- OTPs are generated server-side with a cryptographically secure RNG.
+- Operational reports must not contain passwords, secrets, OTP values, private keys, or full KYC documents.
+- The existing Supabase Auth email OTP fallback remains available if ORENZA's SMTP transport is unavailable.
 
-The code can be built now, but a truly independent mail system cannot be made production-deliverable from the GitHub repository alone. It requires control of the `orenzatech.com` DNS zone and a public server/IP. Until those are configured, ORENZA should report that SMTP is not configured rather than silently pretending that emails were delivered.
+## Cost-conscious operation
 
-## First mailbox
+SMTP2GO currently offers a free plan with up to 1,000 emails/month and 200/day. The application does not assume a paid plan; it simply reports delivery/configuration failures. If ORENZA outgrows the free allowance, the same SMTP transport can use a paid SMTP2GO plan without application code changes.
 
-The requested report recipient is `Supportdeveloperer@gmail.com`. That address can subscribe through `/reports/subscribe` after the SMTP transport and subscription database are configured.
+## Future provider migration
+
+Because application routes call `sendOrenzaEmail()` rather than a provider SDK directly, ORENZA can later move to another SMTP service or a self-hosted ORENZA mail server by changing the transport configuration/implementation instead of rewriting OTP, KYC, and report routes.
+
+## First report recipient
+
+The requested report recipient is `Supportdeveloperer@gmail.com`. That address can subscribe through `/reports/subscribe` after the SMTP2GO sender domain, SMTP user, and subscription database are configured.
