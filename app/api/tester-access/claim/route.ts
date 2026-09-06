@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
 import { jsonError } from '../../../../lib/paystack/server';
 
 export const dynamic = 'force-dynamic';
 
 const FALLBACK_SUPABASE_URL = 'https://snqfmhvumqpizjhqopoh.supabase.co';
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_mHevxxxy7xzWvcx4JxVp5w_6xgRLhVQ';
+const TESTER_ACCESS_MAX_AGE = 14 * 24 * 60 * 60;
 
 function hash(value: string) {
   return createHash('sha256').update(value).digest('hex');
@@ -16,11 +16,7 @@ function getSupabaseUrl() {
 }
 
 function getSupabasePublishableKey() {
-  return (
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
-    FALLBACK_SUPABASE_PUBLISHABLE_KEY
-  );
+  return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
 }
 
 export async function POST(request: Request) {
@@ -34,7 +30,6 @@ export async function POST(request: Request) {
       auth: { autoRefreshToken: false, persistSession: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-
     const { data: authData, error: authError } = await db.auth.getUser(token);
     if (authError || !authData.user) throw new Error('UNAUTHORIZED');
 
@@ -56,10 +51,7 @@ export async function POST(request: Request) {
       { ok: true, access: 'TESTER', expires_at: result.expires_at, message: result.message },
       { headers: { 'Cache-Control': 'no-store' } },
     );
-    response.headers.append(
-      'Set-Cookie',
-      `orenza_tester_access=${accessToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3456000`,
-    );
+    response.headers.append('Set-Cookie', `orenza_tester_access=${accessToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${TESTER_ACCESS_MAX_AGE}`);
     return response;
   } catch (error) {
     return jsonError(error, 401);
