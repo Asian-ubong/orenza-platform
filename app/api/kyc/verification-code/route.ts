@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { sendOrenzaEmail } from '@/lib/reports/mailer';
 
 function admin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -9,31 +10,14 @@ function admin() {
 }
 
 async function sendCodeEmail(to: string, code: string, fullName?: string, phone?: string) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) return false;
   const greeting = fullName ? `Hello ${fullName},` : 'Hello,';
   const phoneLine = phone ? `\nRegistered phone: ${phone}` : '';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 4500);
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject: 'Your Orenza identity verification code',
-        text: `${greeting}\n\nYour Orenza identity verification code is ${code}.${phoneLine}\n\nIt expires in 10 minutes and can only be used once. Do not share this code. This code is sent by email only; Orenza does not send this verification code to your phone number.`,
-      }),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
+  const result = await sendOrenzaEmail({
+    to,
+    subject: 'Your Orenza identity verification code',
+    text: `${greeting}\n\nYour Orenza identity verification code is ${code}.${phoneLine}\n\nIt expires in 10 minutes and can only be used once. Do not share this code. This code is sent by email only; Orenza does not send this verification code to your phone number.`,
+  });
+  return result.ok;
 }
 
 async function publicAuth() {
@@ -77,7 +61,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ challenge_id: challenge.id, expires_at: challenge.expires_at, email: user.email, delivery: 'email' });
     }
 
-    // If Orenza's transactional email provider is unavailable, use Supabase Auth email OTP.
+    // If SMTP2GO is unavailable, use Supabase Auth email OTP as a fallback.
     await db.from('kyc_face_otp_challenges').update({ consumed_at: new Date().toISOString() }).eq('id', challenge.id);
     const authClient = await publicAuth();
     if (!authClient) return NextResponse.json({ error: 'Email delivery is temporarily unavailable. Please try again.' }, { status: 503 });
