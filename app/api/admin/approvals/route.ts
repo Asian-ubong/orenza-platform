@@ -27,7 +27,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Admin authorization required.' }, { status: 403 });
   const db = adminDb();
   if (!db) return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
-  const { data, error } = await db.from('orenza_payouts').select('id,user_id,wallet_type,amount,status,created_at').eq('status', 'PENDING').order('created_at', { ascending: false }).limit(100);
+  const { data, error } = await db.from('orenza_payout_requests').select('id,user_id,amount,currency,payout_method,provider_adapter,status,created_at,metadata').eq('status', 'PENDING').order('created_at', { ascending: false }).limit(100);
   if (error) return NextResponse.json({ error: 'Could not load pending approvals.' }, { status: 500 });
   return NextResponse.json({ approvals: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } });
 }
@@ -43,13 +43,13 @@ export async function POST(req: Request) {
   const reason = String(body.reason || '').trim().slice(0, 500) || null;
   if (!id || !['APPROVED', 'DECLINED'].includes(decision)) return NextResponse.json({ error: 'Invalid approval decision.' }, { status: 400 });
 
-  const { data: current, error: readError } = await db.from('orenza_payouts').select('id,status').eq('id', id).eq('status', 'PENDING').maybeSingle();
+  const { data: current, error: readError } = await db.from('orenza_payout_requests').select('id,status').eq('id', id).eq('status', 'PENDING').maybeSingle();
   if (readError) return NextResponse.json({ error: 'Could not verify approval state.' }, { status: 500 });
   if (!current) return NextResponse.json({ error: 'Approval is no longer pending.' }, { status: 409 });
 
-  // Real-money execution remains disabled. Approval only records the owner decision.
+  // Owner approval is recorded, but provider execution remains disabled in sandbox-first mode.
   const nextStatus = decision === 'APPROVED' ? 'PROCESSING' : 'REJECTED';
-  const { data: updated, error: updateError } = await db.from('orenza_payouts').update({ status: nextStatus }).eq('id', id).eq('status', 'PENDING').select('id,status').maybeSingle();
+  const { data: updated, error: updateError } = await db.from('orenza_payout_requests').update({ status: nextStatus }).eq('id', id).eq('status', 'PENDING').select('id,status').maybeSingle();
   if (updateError || !updated) return NextResponse.json({ error: 'Approval could not be committed.' }, { status: 409 });
 
   const { error: auditError } = await db.from('orenza_approval_audit').insert({ target_type: 'PAYOUT', target_id: id, decision, actor_user_id: user.id, previous_status: 'PENDING', new_status: nextStatus, reason });
