@@ -4,23 +4,21 @@ import { createClient } from '@supabase/supabase-js';
 const FALLBACK_SUPABASE_URL = 'https://snqfmhvumqpizjhqopoh.supabase.co';
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_mHevxxxy7xzWvcx4JxVp5w_6xgRLhVQ';
 
-function serverAdminClient() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) return null;
-  return createClient(url, key, {
+function supabaseUrl() {
+  return process.env.SUPABASE_URL?.trim() || process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
+}
+
+function publicAuthClient() {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || FALLBACK_SUPABASE_PUBLISHABLE_KEY;
+  return createClient(supabaseUrl(), key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
 
-function publicAuthClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || FALLBACK_SUPABASE_URL;
-  const key = (
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
-    FALLBACK_SUPABASE_PUBLISHABLE_KEY
-  );
-  return createClient(url, key, {
+function serverAdminClient() {
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return null;
+  return createClient(supabaseUrl(), key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
@@ -34,15 +32,15 @@ export async function POST(req: Request) {
     const password = String(body.password || '');
 
     if (fullName.length < 2) return NextResponse.json({ error: 'Enter your full legal name.' }, { status: 400 });
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
+    if (!/^\S+@\S+\.\S+$/.test(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
     if (!phone || phone.includes('@')) return NextResponse.json({ error: 'Enter a valid phone number.' }, { status: 400 });
     if (password.length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
 
     const metadata = { full_name: fullName, phone };
     const admin = serverAdminClient();
+    const auth = publicAuthClient();
+    let userId: string | null = null;
 
-    // Preferred production path: a server-only Supabase secret creates and
-    // confirms the account without sending an email confirmation message.
     if (admin) {
       const created = await admin.auth.admin.createUser({
         email,
@@ -78,56 +76,46 @@ export async function POST(req: Request) {
       }
 
       if (!user) return NextResponse.json({ error: 'Account creation failed.' }, { status: 400 });
-
-      // Admin-created users do not receive a client session from createUser.
-      // The browser completes the normal password sign-in after this response.
-      return NextResponse.json({ user_id: user.id, email: user.email, authenticated: false, status: 'created' });
-    }
-
-    // Tester/public path. The database trigger auto-confirms the new email.
-    // If Supabase does not return a session from signUp(), immediately perform
-    // the password sign-in on the server and return the resulting session.
-    // This removes the fragile second network round-trip from the native app.
-    const auth = publicAuthClient();
-    const { data, error } = await auth.auth.signUp({
-      email,
-      password,
-      options: { data: metadata },
-    });
-
-    if (error) {
-      const message = error.message.toLowerCase();
-      if (message.includes('already registered') || message.includes('already exists')) {
-        return NextResponse.json({ error: 'An account with this email already exists. Log in instead.' }, { status: 409 });
+      userId = user.id;
+    } else {
+      const { data, error } = await auth.auth.signUp({ email, password, options: { data: metadata } });
+      if (error) {
+        const message = error.message.toLowerCase();
+        if (message.includes('already registered') || message.includes('already exists')) {
+          return NextResponse.json({ error: 'An account with this email already exists. Log in instead.' }, { status: 409 });
+        }
+        console.error('[auth/register] public signUp failed:', error.message);
+        return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 });
       }
-      console.error('[auth/register] public signUp failed:', error.message);
-      return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 });
-    }
-
-    const user = data.user;
-    let session = data.session;
-
-    if (user && !session) {
-      const signedIn = await auth.auth.signInWithPassword({ email, password });
-      if (signedIn.error || !signedIn.data.session) {
-        console.error('[auth/register] immediate sign-in failed:', signedIn.error?.message || 'No session returned');
-        return NextResponse.json({ error: 'Account was created, but the ORENZA session could not be started. Please try again.' }, { status: 503 });
+      if (!data.user) return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 400 });
+      userId = data.user.id;
+      if (data.session) {
+        return NextResponse.json({
+          user_id: userId,
+          email,
+          authenticated: true,
+          status: 'created',
+          session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
+        });
       }
-      session = signedIn.data.session;
     }
 
-    if (!user || !session?.access_token || !session.refresh_token) {
-      return NextResponse.json({ error: 'Account creation could not start the ORENZA session. Please try again.' }, { status: 503 });
+    // The server-created account has no browser session yet. Start one through
+    // the normal public password-auth path and return the tokens to the client.
+    const signedIn = await auth.auth.signInWithPassword({ email, password });
+    if (signedIn.error || !signedIn.data.user || !signedIn.data.session?.access_token || !signedIn.data.session.refresh_token) {
+      console.error('[auth/register] session bootstrap failed:', signedIn.error?.message || 'No session returned');
+      return NextResponse.json({ error: 'Account was created, but the ORENZA session could not be started. Please try again.' }, { status: 503 });
     }
 
     return NextResponse.json({
-      user_id: user.id,
-      email: user.email,
+      user_id: userId,
+      email: signedIn.data.user.email,
       authenticated: true,
       status: 'created',
       session: {
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
+        access_token: signedIn.data.session.access_token,
+        refresh_token: signedIn.data.session.refresh_token,
       },
     });
   } catch (error) {
