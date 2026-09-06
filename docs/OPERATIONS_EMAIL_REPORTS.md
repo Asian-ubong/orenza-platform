@@ -17,12 +17,26 @@ The subscriber must confirm the email before delivery starts.
 
 Reports are operational summaries, not a replacement for opening the underlying failure log. A failure email means the owner should inspect the linked workflow/run and fix the underlying issue.
 
+## Email transport
+
+ORENZA now sends application and operational emails through the provider-neutral `lib/reports/mailer.ts` transport configured for **SMTP2GO SMTP**. No Resend API key is required.
+
+SMTP2GO defaults:
+
+- Host: `mail.smtp2go.com`
+- STARTTLS port: `2525` (587 also supported)
+- SMTP credentials: created under SMTP2GO **Sending → SMTP Users**
+- Sender: a verified `orenzatech.com` address
+
 ## Required configuration
 
 Server/Vercel:
 
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
 - `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
 - `ORENZA_REPORT_WEBHOOK_SECRET`
@@ -48,4 +62,4 @@ Apply `supabase/migrations/20260905100000_orenza_report_subscriptions.sql` befor
 
 ## Current limitation
 
-Email delivery cannot be truthfully marked active until a real Resend account/domain configuration is present in server environment variables. The repository contains the complete delivery boundary, but credentials are intentionally not invented or committed.
+The repository now contains the SMTP2GO integration boundary, but email delivery is **not** claimed operational until the SMTP2GO sender domain is verified, an SMTP User exists, and the corresponding server environment variables are configured. Credentials are intentionally not invented or committed.
