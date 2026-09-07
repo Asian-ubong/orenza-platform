@@ -1,0 +1,66 @@
+name: Orenza CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orenza-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  build-test:
+    name: Build + Typecheck + E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install pnpm
+        run: corepack prepare pnpm@10.12.4 --activate
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: TypeScript typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Start production server
+        run: pnpm start > /tmp/orenza-next.log 2>&1 &
+
+      - name: Wait for production server
+        run: node -e "const wait=async()=>{for(let i=0;i<45;i++){try{const r=await fetch('http://127.0.0.1:3000/');if(r.ok)process.exit(0)}catch{} await new Promise(r=>setTimeout(r,1000))}process.exit(1)};wait()"
+
+      - name: E2E smoke tests
+        run: pnpm run e2e:smoke
+
+      - name: Upload Next.js server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orenza-ci-server-log-${{ github.run_id }}
+          path: /tmp/orenza-next.log
+          if-no-files-found: ignore
+          retention-days: 7
