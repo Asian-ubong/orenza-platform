@@ -154,20 +154,24 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
-            set -euxo pipefail
+            set -eu
             adb start-server
             adb wait-for-device
-            for i in $(seq 1 90); do
+            i=1
+            while [ "$i" -le 90 ]; do
               state="$(adb get-state 2>/dev/null || true)"
               if [ "$state" = "device" ]; then break; fi
               adb reconnect offline || true
               sleep 2
+              i=$((i + 1))
             done
             test "$(adb get-state)" = "device"
-            for i in $(seq 1 60); do
+            i=1
+            while [ "$i" -le 60 ]; do
               boot="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
               if [ "$boot" = "1" ]; then break; fi
               sleep 2
+              i=$((i + 1))
             done
             test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
             adb install --no-streaming -r artifacts/orenza-admin-debug.apk
