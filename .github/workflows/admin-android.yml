@@ -1,0 +1,109 @@
+name: ORENZA Admin Android CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/admin/**'
+      - 'admin-capacitor.config.ts'
+      - 'scripts/admin-build.mjs'
+      - 'android/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/admin-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
+
+  android:
+    needs: validate-web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Sync dedicated Admin Android project
+        run: npx cap sync android --config admin-capacitor.config.ts
+      - name: Verify Admin application identity
+        run: |
+          grep -R "com.orenzatech.orenza.admin" android/app/src android/app/build.gradle* android/variables.gradle* || true
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Build release APK and AAB
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease bundleRelease
+      - name: Validate artifacts
+        run: |
+          set -euo pipefail
+          test -s "$(find android/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)"
+          test -s "$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
+          test -s "$(find android/app/build/outputs/bundle/release -maxdepth 1 -name '*.aab' -print -quit)"
+          mkdir -p artifacts
+          cp "$(find android/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)" artifacts/orenza-admin-debug.apk
+          cp "$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)" artifacts/orenza-admin-release.apk
+          cp "$(find android/app/build/outputs/bundle/release -maxdepth 1 -name '*.aab' -print -quit)" artifacts/orenza-admin-release.aab
+          sha256sum artifacts/* > artifacts/orenza-admin.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orenza-admin-android-${{ github.sha }}
+          path: artifacts/
+          retention-days: 30
+
+  e2e-admin:
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: orenza-admin-android-${{ github.sha }}
+          path: artifacts
+      - name: Admin APK smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb wait-for-device
+            test "$(adb get-state)" = "device"
+            test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+            adb install --no-streaming -r artifacts/orenza-admin-debug.apk
+            adb shell monkey -p com.orenzatech.orenza.admin 1
+            sleep 8
+            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+            adb shell am force-stop com.orenzatech.orenza.admin
+
+  finalize:
+    if: ${{ always() }}
+    needs: [validate-web, android, e2e-admin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: End-to-end gate
+        run: |
+          test "${{ needs.validate-web.result }}" = success
+          test "${{ needs.android.result }}" = success
+          test "${{ needs.e2e-admin.result }}" = success
+          echo "ORENZA Admin end-to-end pipeline PASSED"
