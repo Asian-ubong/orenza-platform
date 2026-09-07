@@ -43,11 +43,20 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
-      - name: Sync dedicated Admin Android project
-        run: npx cap sync android --config admin-capacitor.config.ts
-      - name: Verify Admin application identity
+      - name: Create or synchronize dedicated Admin Android project
         run: |
-          grep -R "com.orenzatech.orenza.admin" android/app/src android/app/build.gradle* android/variables.gradle* || true
+          if [ -d android ]; then
+            echo "Android project exists; synchronizing Admin configuration."
+          else
+            echo "Android project is missing; creating it from the Admin Capacitor config."
+            npx cap add android --config admin-capacitor.config.ts
+          fi
+          npx cap sync android --config admin-capacitor.config.ts
+      - name: Enforce Admin application identity
+        run: |
+          set -euo pipefail
+          grep -R "com.orenzatech.orenza.admin" android/app/src android/app/build.gradle* android/variables.gradle* android/capacitor-cordova-android-plugins 2>/dev/null || true
+          test -f android/app/build.gradle || test -f android/app/build.gradle.kts
       - name: Build debug APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
@@ -57,13 +66,16 @@ jobs:
       - name: Validate artifacts
         run: |
           set -euo pipefail
-          test -s "$(find android/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)"
-          test -s "$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)"
-          test -s "$(find android/app/build/outputs/bundle/release -maxdepth 1 -name '*.aab' -print -quit)"
+          debug_apk=$(find android/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
+          release_apk=$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)
+          release_aab=$(find android/app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)
+          test -n "$debug_apk" && test -s "$debug_apk"
+          test -n "$release_apk" && test -s "$release_apk"
+          test -n "$release_aab" && test -s "$release_aab"
           mkdir -p artifacts
-          cp "$(find android/app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)" artifacts/orenza-admin-debug.apk
-          cp "$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)" artifacts/orenza-admin-release.apk
-          cp "$(find android/app/build/outputs/bundle/release -maxdepth 1 -name '*.aab' -print -quit)" artifacts/orenza-admin-release.aab
+          cp "$debug_apk" artifacts/orenza-admin-debug.apk
+          cp "$release_apk" artifacts/orenza-admin-release.apk
+          cp "$release_aab" artifacts/orenza-admin-release.aab
           sha256sum artifacts/* > artifacts/orenza-admin.sha256
       - uses: actions/upload-artifact@v4
         with:
@@ -80,20 +92,23 @@ jobs:
         with:
           name: orenza-admin-android-${{ github.sha }}
           path: artifacts
-      - name: Admin APK smoke test
+      - name: Admin APK emulator end-to-end smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_6
           script: |
+            set -eux
             adb wait-for-device
             test "$(adb get-state)" = "device"
             test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
             adb install --no-streaming -r artifacts/orenza-admin-debug.apk
+            adb shell pm path com.orenzatech.orenza.admin
             adb shell monkey -p com.orenzatech.orenza.admin 1
             sleep 8
             adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+            adb shell dumpsys package com.orenzatech.orenza.admin | grep -E 'versionName|versionCode'
             adb shell am force-stop com.orenzatech.orenza.admin
 
   finalize:
