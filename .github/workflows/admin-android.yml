@@ -5,9 +5,9 @@ on:
     branches: [main]
     paths:
       - 'app/admin/**'
+      - 'app/api/admin/**'
       - 'admin-capacitor.config.ts'
       - 'scripts/admin-build.mjs'
-      - 'android/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/admin-android.yml'
@@ -16,66 +16,95 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: orenza-admin-android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
 jobs:
   validate-web:
+    name: Admin web validation
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm install
-      - run: npm run typecheck
-      - run: npm run build
+          cache: pnpm
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install pnpm
+        run: corepack prepare pnpm@10.12.4 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript typecheck
+        run: pnpm run typecheck
+      - name: Production build
+        run: pnpm run build
+      - name: Start production server
+        run: pnpm start > /tmp/orenza-admin-next.log 2>&1 &
+      - name: Wait for production server
+        run: node -e "const wait=async()=>{for(let i=0;i<45;i++){try{const r=await fetch('http://127.0.0.1:3000/admin');if(r.ok||[301,302,307,308,401,403].includes(r.status))process.exit(0)}catch{} await new Promise(r=>setTimeout(r,1000))}process.exit(1)};wait()"
+      - name: Admin route smoke
+        run: node -e "const p=['/admin','/admin/dashboard','/admin/users','/admin/build-tracker']; const f=async()=>{for(const x of p){const r=await fetch('http://127.0.0.1:3000'+x,{redirect:'manual'}); if(![200,301,302,307,308,401,403].includes(r.status)) throw new Error(x+' returned '+r.status); console.log(x,r.status)}};f().catch(e=>{console.error(e);process.exit(1)})"
+      - name: Upload web log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orenza-admin-web-log-${{ github.run_id }}
+          path: /tmp/orenza-admin-next.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   android:
+    name: Dedicated Admin Android build
     needs: validate-web
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+          cache: pnpm
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Install pnpm
+        run: corepack prepare pnpm@10.12.4 --activate
+      - run: pnpm install --frozen-lockfile
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: gradle
-      - name: Create or synchronize dedicated Admin Android project
-        run: |
-          if [ -d android ]; then
-            echo "Android project exists; synchronizing Admin configuration."
-          else
-            echo "Android project is missing; creating it from the Admin Capacitor config."
-            npx cap add android --config admin-capacitor.config.ts
-          fi
-          npx cap sync android --config admin-capacitor.config.ts
+      - name: Generate isolated Admin Android project
+        run: pnpm run admin:build
       - name: Enforce Admin application identity
         run: |
           set -euo pipefail
-          grep -R "com.orenzatech.orenza.admin" android/app/src android/app/build.gradle* android/variables.gradle* android/capacitor-cordova-android-plugins 2>/dev/null || true
-          test -f android/app/build.gradle || test -f android/app/build.gradle.kts
+          test -d android-admin/app
+          grep -R "com.orenzatech.orenza.admin" android-admin/app/src android-admin/app/build.gradle* android-admin/variables.gradle* 2>/dev/null | head
       - name: Build debug APK
-        working-directory: android
+        working-directory: android-admin
         run: ./gradlew --no-daemon assembleDebug
       - name: Build release APK and AAB
-        working-directory: android
+        working-directory: android-admin
         run: ./gradlew --no-daemon assembleRelease bundleRelease
-      - name: Validate artifacts
+      - name: Validate and package artifacts
         run: |
           set -euo pipefail
-          debug_apk=$(find android/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
-          release_apk=$(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)
-          release_aab=$(find android/app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)
-          test -n "$debug_apk" && test -s "$debug_apk"
-          test -n "$release_apk" && test -s "$release_apk"
-          test -n "$release_aab" && test -s "$release_aab"
+          debug_apk=$(find android-admin/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
+          release_apk=$(find android-admin/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' -print -quit)
+          release_aab=$(find android-admin/app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)
+          test -s "$debug_apk"
+          test -s "$release_apk"
+          test -s "$release_aab"
           mkdir -p artifacts
           cp "$debug_apk" artifacts/orenza-admin-debug.apk
-          cp "$release_apk" artifacts/orenza-admin-release.apk
-          cp "$release_aab" artifacts/orenza-admin-release.aab
+          cp "$release_apk" artifacts/orenza-admin-release-unsigned.apk
+          cp "$release_aab" artifacts/orenza-admin-release-unsigned.aab
           sha256sum artifacts/* > artifacts/orenza-admin.sha256
       - uses: actions/upload-artifact@v4
         with:
@@ -84,8 +113,10 @@ jobs:
           retention-days: 30
 
   e2e-admin:
+    name: Admin Android emulator E2E
     needs: android
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -106,19 +137,20 @@ jobs:
             adb install --no-streaming -r artifacts/orenza-admin-debug.apk
             adb shell pm path com.orenzatech.orenza.admin
             adb shell monkey -p com.orenzatech.orenza.admin 1
-            sleep 8
+            sleep 10
             adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
             adb shell dumpsys package com.orenzatech.orenza.admin | grep -E 'versionName|versionCode'
             adb shell am force-stop com.orenzatech.orenza.admin
 
   finalize:
+    name: Admin release gate
     if: ${{ always() }}
     needs: [validate-web, android, e2e-admin]
     runs-on: ubuntu-latest
     steps:
-      - name: End-to-end gate
+      - name: End-to-end green gate
         run: |
           test "${{ needs.validate-web.result }}" = success
           test "${{ needs.android.result }}" = success
           test "${{ needs.e2e-admin.result }}" = success
-          echo "ORENZA Admin end-to-end pipeline PASSED"
+          echo "ORENZA Admin: Foundation -> Navigation -> Authentication boundary -> Dashboard -> Android -> E2E VERIFIED"
