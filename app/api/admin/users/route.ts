@@ -12,9 +12,10 @@ function serverAdmin() {
 }
 
 async function actor() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || 'https://snqfmhvumqpizjhqopoh.supabase.co';
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  if (!key) return null;
+  if (!url || !key) return null;
+
   const jar = await cookies();
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -24,18 +25,31 @@ async function actor() {
   });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: access } = await supabase.from('orenza_private_access').select('role,status').eq('user_id', user.id).eq('status', 'ACTIVE').maybeSingle();
-  return access && ADMIN_ROLES.has(String(access.role).toUpperCase()) ? { id: user.id, role: String(access.role).toUpperCase() } : null;
+
+  const { data: access } = await supabase
+    .from('orenza_private_access')
+    .select('role,status')
+    .eq('user_id', user.id)
+    .eq('status', 'ACTIVE')
+    .maybeSingle();
+
+  return access && ADMIN_ROLES.has(String(access.role).toUpperCase())
+    ? { id: user.id, role: String(access.role).toUpperCase() }
+    : null;
 }
 
 export async function GET() {
   const user = await actor();
   if (!user) return NextResponse.json({ error: 'Admin authorization required.' }, { status: 403 });
+
   const db = serverAdmin();
   if (!db) return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
 
   const { data, error } = await db.auth.admin.listUsers({ page: 1, perPage: 100 });
-  if (error) return NextResponse.json({ error: 'Could not load users.' }, { status: 500 });
+  if (error) {
+    console.error('[admin/users] listUsers failed:', error.message);
+    return NextResponse.json({ error: 'Could not load users.' }, { status: 500 });
+  }
 
   return NextResponse.json({
     users: (data.users ?? []).map((u) => ({
@@ -54,10 +68,15 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await actor();
   if (!user) return NextResponse.json({ error: 'Admin authorization required.' }, { status: 403 });
+
   const db = serverAdmin();
   if (!db) return NextResponse.json({ error: 'Server authentication is not configured.' }, { status: 503 });
 
-  const body = await req.json().catch(() => ({}));
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'A valid JSON request body is required.' }, { status: 400 });
+  }
+
   const fullName = String(body.full_name ?? '').trim();
   const email = String(body.email ?? '').trim().toLowerCase();
   const phone = String(body.phone ?? '').trim();
@@ -87,6 +106,7 @@ export async function POST(req: Request) {
   const names = fullName.split(/\s+/);
   const firstName = names.shift() ?? '';
   const lastName = names.join(' ');
+
   const { error: profileError } = await db.from('profiles').upsert({
     user_id: createdUser.id,
     first_name: firstName,
