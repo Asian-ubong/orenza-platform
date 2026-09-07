@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Activity, AlertTriangle, BarChart3, Bell, Bot, CircleDollarSign, ClipboardCheck, Database, FileText, Globe2, KeyRound, LockKeyhole, Monitor, Settings, ShieldCheck, UserCheck, Users, WalletCards } from 'lucide-react';
+import UserManagement from './users/UserManagement';
 
 export const ADMIN_SCREENS = [
   ['dashboard','Dashboard','Executive overview and operational control',BarChart3],
@@ -92,6 +93,7 @@ export function AdminScreen({ path }: { path: string }) {
   const desc = descFor(path);
   const isDashboard = path === 'dashboard';
   const childScreens = ADMIN_SCREENS.filter(screen => screen[0].startsWith(`${path}/`));
+  const isUsers = path === 'users';
 
   return <div>
     <header className="pageHead">
@@ -111,7 +113,7 @@ export function AdminScreen({ path }: { path: string }) {
       <span><b>Administrative safety boundary:</b> viewing a screen never grants permission. Account changes, money movement, trading, configuration and other high-impact actions must be authorized by the backend.</span>
     </div>
 
-    {isDashboard ? <>
+    {isUsers ? <UserManagement /> : isDashboard ? <>
       <section className="metricGrid">
         <Metric label="CUSTOMER ACCOUNTS" value="Live" detail="Loaded from the admin data layer" />
         <Metric label="COMPLIANCE QUEUE" value="Live" detail="KYC and AML review status" />
