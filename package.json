@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "e2e:smoke": "node scripts/e2e-smoke.mjs",
+    "admin:build": "node scripts/admin-build.mjs",
     "android:sync": "cap sync android",
     "android:open": "cap open android"
   },
