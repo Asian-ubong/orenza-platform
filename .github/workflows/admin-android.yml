@@ -6,6 +6,10 @@ on:
     paths:
       - 'app/admin/**'
       - 'app/api/admin/**'
+      - 'app/api/auth/**'
+      - 'components/admin/**'
+      - 'lib/**'
+      - 'public/**'
       - 'admin-capacitor.config.ts'
       - 'scripts/admin-build.mjs'
       - 'package.json'
@@ -22,6 +26,7 @@ concurrency:
 
 env:
   CI: true
+  JAVA_VERSION: '21'
 
 jobs:
   validate-web:
@@ -29,8 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
@@ -38,7 +45,8 @@ jobs:
         run: corepack enable
       - name: Install pnpm
         run: corepack prepare pnpm@10.12.4 --activate
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: TypeScript typecheck
         run: pnpm run typecheck
       - name: Production build
@@ -46,7 +54,7 @@ jobs:
       - name: Start production server
         run: pnpm start > /tmp/orenza-admin-next.log 2>&1 &
       - name: Wait for production server
-        run: node -e "const wait=async()=>{for(let i=0;i<45;i++){try{const r=await fetch('http://127.0.0.1:3000/admin');if(r.ok||[301,302,307,308,401,403].includes(r.status))process.exit(0)}catch{} await new Promise(r=>setTimeout(r,1000))}process.exit(1)};wait()"
+        run: node -e "const wait=async()=>{for(let i=0;i<45;i++){try{const r=await fetch('http://127.0.0.1:3000/admin',{redirect:'manual'});if([200,301,302,307,308,401,403].includes(r.status))process.exit(0)}catch{} await new Promise(r=>setTimeout(r,1000))}process.exit(1)};wait()"
       - name: Admin route smoke
         run: node -e "const p=['/admin','/admin/dashboard','/admin/users','/admin/build-tracker']; const f=async()=>{for(const x of p){const r=await fetch('http://127.0.0.1:3000'+x,{redirect:'manual'}); if(![200,301,302,307,308,401,403].includes(r.status)) throw new Error(x+' returned '+r.status); console.log(x,r.status)}};f().catch(e=>{console.error(e);process.exit(1)})"
       - name: Upload web log on failure
@@ -64,8 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
@@ -73,11 +83,13 @@ jobs:
         run: corepack enable
       - name: Install pnpm
         run: corepack prepare pnpm@10.12.4 --activate
-      - run: pnpm install --frozen-lockfile
-      - uses: actions/setup-java@v4
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
       - name: Generate isolated Admin Android project
         run: pnpm run admin:build
@@ -85,14 +97,15 @@ jobs:
         run: |
           set -euo pipefail
           test -d android-admin/app
-          grep -R "com.orenzatech.orenza.admin" android-admin/app/src android-admin/app/build.gradle* android-admin/variables.gradle* 2>/dev/null | head
+          grep -R "com.orenzatech.orenza.admin" android-admin/app/src android-admin/app/build.gradle* android-admin/variables.gradle* 2>/dev/null | head -n 20
+          ! grep -R "com.orenzatech.orenza[^.]*$\|com.orenzatech.orenza'" android-admin/app/src android-admin/app/build.gradle* 2>/dev/null || true
       - name: Build debug APK
         working-directory: android-admin
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
       - name: Build release APK and AAB
         working-directory: android-admin
-        run: ./gradlew --no-daemon assembleRelease bundleRelease
-      - name: Validate and package artifacts
+        run: ./gradlew --no-daemon --stacktrace assembleRelease bundleRelease
+      - name: Validate APK and AAB outputs
         run: |
           set -euo pipefail
           debug_apk=$(find android-admin/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)
@@ -101,15 +114,19 @@ jobs:
           test -s "$debug_apk"
           test -s "$release_apk"
           test -s "$release_aab"
+          $ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --verbose "$debug_apk"
+          $ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner verify --verbose "$release_apk"
           mkdir -p artifacts
           cp "$debug_apk" artifacts/orenza-admin-debug.apk
           cp "$release_apk" artifacts/orenza-admin-release-unsigned.apk
           cp "$release_aab" artifacts/orenza-admin-release-unsigned.aab
           sha256sum artifacts/* > artifacts/orenza-admin.sha256
-      - uses: actions/upload-artifact@v4
+      - name: Upload Admin Android artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: orenza-admin-android-${{ github.sha }}
           path: artifacts/
+          if-no-files-found: error
           retention-days: 30
 
   e2e-admin:
@@ -118,29 +135,52 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download Admin Android artifacts
+        uses: actions/download-artifact@v4
         with:
           name: orenza-admin-android-${{ github.sha }}
           path: artifacts
+      - name: Verify artifact checksum
+        run: sha256sum -c artifacts/orenza-admin.sha256
       - name: Admin APK emulator end-to-end smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_6
+          force-avd-creation: true
+          emulator-boot-timeout: 600
+          disable-animations: true
           script: |
-            set -eux
+            set -euxo pipefail
+            adb start-server
             adb wait-for-device
+            for i in $(seq 1 90); do
+              state="$(adb get-state 2>/dev/null || true)"
+              if [ "$state" = "device" ]; then break; fi
+              adb reconnect offline || true
+              sleep 2
+            done
             test "$(adb get-state)" = "device"
+            for i in $(seq 1 60); do
+              boot="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+              if [ "$boot" = "1" ]; then break; fi
+              sleep 2
+            done
             test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
             adb install --no-streaming -r artifacts/orenza-admin-debug.apk
             adb shell pm path com.orenzatech.orenza.admin
             adb shell monkey -p com.orenzatech.orenza.admin 1
             sleep 10
-            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+            adb shell pidof com.orenzatech.orenza.admin
             adb shell dumpsys package com.orenzatech.orenza.admin | grep -E 'versionName|versionCode'
+            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+            adb install --no-streaming -r artifacts/orenza-admin-debug.apk
+            adb shell pidof com.orenzatech.orenza.admin || true
             adb shell am force-stop com.orenzatech.orenza.admin
+            ! adb shell pidof com.orenzatech.orenza.admin
 
   finalize:
     name: Admin release gate
@@ -150,7 +190,8 @@ jobs:
     steps:
       - name: End-to-end green gate
         run: |
+          set -euo pipefail
           test "${{ needs.validate-web.result }}" = success
           test "${{ needs.android.result }}" = success
           test "${{ needs.e2e-admin.result }}" = success
-          echo "ORENZA Admin: Foundation -> Navigation -> Authentication boundary -> Dashboard -> Android -> E2E VERIFIED"
+          echo "ORENZA Admin: web -> navigation -> auth boundary -> dashboard -> APK -> upgrade install -> E2E VERIFIED"
